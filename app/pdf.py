@@ -149,7 +149,14 @@ def build_scorecard_pdf(sc: Scorecard) -> bytes:
     story.append(Paragraph(sc.company_name, S["h1"]))
     story.append(Paragraph(f"{sc.industry_label} &nbsp;·&nbsp; {sc.assessment_date} &nbsp;·&nbsp; "
                            f"Reviewed by {sc.reviewed_by}", S["meta"]))
-    story.append(Spacer(1, 10))
+    story.append(Spacer(1, 8))
+    _graded = [d for d in sc.dimensions if not d.informational]
+    if _graded:
+        _st = max(_graded, key=lambda d: d.score); _wk = min(_graded, key=lambda d: d.score)
+        story.append(Paragraph(
+            f"<b>{sc.company_name}</b> is at the <b>{sc.overall_tier}</b> stage of AI readiness, scoring "
+            f"{sc.overall_score} of 100. Strongest: {_st.label}. Priority gap: {_wk.label}.", S["body"]))
+        story.append(Spacer(1, 10))
 
     # Radar + overall + dimension table (two columns)
     tier_hex = TIER_COLORS.get(sc.overall_tier, "#FFAE41")
@@ -226,34 +233,49 @@ class VDChart(Flowable):
         super().__init__()
         self.items = items
         self.size = size
-        self.width = size + 0.7 * inch
-        self.height = size + 0.5 * inch
+        self.width = size + 0.8 * inch
+        self.height = size + 0.6 * inch
 
     def draw(self):
         c = self.canv
         s = self.size
-        ox, oy = 0.45 * inch, 0.3 * inch
+        ox, oy = 0.55 * inch, 0.4 * inch
         # priority quadrant tint (upper-left: high value, low difficulty)
         c.setFillColor(colors.HexColor("#EAF2FF"))
         c.rect(ox, oy + s / 2, s / 2, s / 2, fill=1, stroke=0)
         # frame + midlines
-        c.setStrokeColor(LINE); c.setLineWidth(0.8); c.rect(ox, oy, s, s)
+        c.setStrokeColor(colors.HexColor("#C9C4BC")); c.setLineWidth(0.8); c.rect(ox, oy, s, s)
         c.setStrokeColor(colors.HexColor("#E6E1DA"))
         c.line(ox + s / 2, oy, ox + s / 2, oy + s); c.line(ox, oy + s / 2, ox + s, oy + s / 2)
-        c.setFont("Helvetica-Bold", 7); c.setFillColor(ROYAL)
-        c.drawString(ox + 4, oy + s - 10, "PRIORITY")
+        # quadrant labels
+        c.setFont("Helvetica-Bold", 7)
+        c.setFillColor(ROYAL); c.drawString(ox + 4, oy + s - 10, "QUICK WINS")
+        c.setFillColor(colors.HexColor("#8A867E")); c.drawRightString(ox + s - 4, oy + s - 10, "STRATEGIC BETS")
+        c.setFillColor(colors.HexColor("#B7B1A8"))
+        c.drawString(ox + 4, oy + 5, "FILL-INS"); c.drawRightString(ox + s - 4, oy + 5, "DEPRIORITIZE")
         # axis labels
         c.setFont("Helvetica", 7); c.setFillColor(INK)
-        c.drawString(ox, oy - 11, "Low difficulty"); c.drawRightString(ox + s, oy - 11, "High difficulty")
-        c.saveState(); c.translate(ox - 12, oy); c.rotate(90)
-        c.drawString(0, 0, "Low value"); c.drawRightString(s, 0, "High value"); c.restoreState()
-        # points
+        c.drawCentredString(ox + s / 2, oy - 12, "Implementation difficulty →")
+        c.saveState(); c.translate(ox - 14, oy + s / 2); c.rotate(90)
+        c.drawCentredString(0, 0, "Business value →"); c.restoreState()
+        # spread overlapping points in a small ring
+        import math as _m
+        counts, idx = {}, {}
         for it in self.items:
-            px = ox + max(0.04, min(0.96, it.difficulty_score)) * s
-            py = oy + max(0.04, min(0.96, it.value_score)) * s
-            c.setFillColor(ROYAL); c.circle(px, py, 3, fill=1, stroke=0)
-            c.setFont("Helvetica", 6); c.setFillColor(MIDNIGHT)
-            c.drawString(px + 4, py - 2, it.opportunity[:28])
+            key = (round(it.difficulty_score * 10), round(it.value_score * 10))
+            counts[key] = counts.get(key, 0) + 1
+        for i, it in enumerate(self.items, 1):
+            key = (round(it.difficulty_score * 10), round(it.value_score * 10))
+            k = idx.get(key, 0); idx[key] = k + 1; m = counts[key]
+            dx = dy = 0.0
+            if m > 1:
+                a = 2 * _m.pi * k / m; dx = _m.cos(a) * 0.055; dy = _m.sin(a) * 0.055
+            vx = min(0.93, max(0.07, it.difficulty_score + dx))
+            vy = min(0.93, max(0.07, it.value_score + dy))
+            px, py = ox + vx * s, oy + vy * s
+            c.setFillColor(ROYAL); c.circle(px, py, 7.5, fill=1, stroke=0)
+            c.setFont("Helvetica-Bold", 8); c.setFillColor(colors.white)
+            c.drawCentredString(px, py - 3, str(i))
 
 
 # ============================================================
@@ -378,7 +400,15 @@ def build_appendix_pdf(session) -> bytes:
 
     if sc.value_difficulty:
         story.append(Paragraph("OPPORTUNITY MAP — VALUE vs DIFFICULTY", S["h2"]))
+        story.append(Paragraph("Where each opportunity sits by business value and effort to implement. "
+                               "Start upper-left (high value, low difficulty).", S["small"]))
+        story.append(Spacer(1, 4))
         story.append(VDChart(sc.value_difficulty))
+        story.append(Spacer(1, 4))
+        _ql = {"high_value_low_difficulty": "quick win", "high_value_high_difficulty": "strategic bet",
+               "low_value_low_difficulty": "fill-in", "low_value_high_difficulty": "deprioritize"}
+        for i, it in enumerate(sc.value_difficulty, 1):
+            story.append(Paragraph(f"<b>{i}.</b> {it.opportunity} — {_ql.get(it.quadrant, '')}", S["small"]))
         story.append(Spacer(1, 6))
 
     for d in sc.dimensions:
