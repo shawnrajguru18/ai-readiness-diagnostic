@@ -86,6 +86,16 @@ const DEMO = {
     {pattern_name:"IT Incident Auto-Categorization",one_line_description:"AI categorizes IT incidents, assigns severity, routes to the right tier.",what_this_would_do:"Cut mean-time-to-assignment and lift tier-1 deflection across your ServiceNow estate.",prerequisites_you_have:["ITSM system","Service catalog documented"],expected_outcome_range:"Mean time to assignment -60-80%",timeline_to_value:"6-10 weeks",implementation_effort:"Low"},
     {pattern_name:"Compliance Document Review",one_line_description:"AI reads regulatory documents and flags compliance issues for review.",what_this_would_do:"Lift compliance review coverage of customer communications while catching more issues, directly addressing the governance gap.",prerequisites_you_have:["Document management system","Internal policy library"],expected_outcome_range:"Issue detection +30-50%",timeline_to_value:"10-14 weeks",implementation_effort:"Medium"},
   ],
+  executive_narrative:{
+    headline:"MeridianFS is at the Developing stage: real experimentation, with governance posture the constraint on scaling to production.",
+    paragraphs:[
+      "MeridianFS Holdings, Inc. is at the Developing stage of AI readiness, scoring 55 of 100, 2 points behind the peer average of 57. The priority now is turning experimentation into dependable production capability.",
+      "AI Investment Maturity (62 of 100) is the most production-ready part of your estate, and the natural place to scale a proven pattern horizontally.",
+      "Governance Posture (38 of 100) is the binding constraint on scaling safely. Addressing it is prerequisite, not parallel work.",
+      "In the next 90 days, Intelligent Invoice Triage, IT Incident Auto-Categorization, and Compliance Document Review are high-confidence patterns with documented enterprise deployments that fit your current architecture and prove delivery.",
+      "The next step is an APR Discovery focused on claims adjudication reinvention and operational AI scaling. Over 6-10 weeks it scopes the build sequence and governance design to close the gap and put value pockets into production.",
+    ],
+  },
   value_difficulty:[
     {opportunity:"Intelligent Invoice Triage",value_score:0.7,difficulty_score:0.3,quadrant:"high_value_low_difficulty"},
     {opportunity:"IT Incident Auto-Categorization",value_score:0.7,difficulty_score:0.3,quadrant:"high_value_low_difficulty"},
@@ -349,6 +359,16 @@ function Scorecard({sc, onQuickWins, onHome}) {
           </div>
           <p className="mt-6 pt-5 border-t border-black/10 text-[15px] leading-relaxed">{summary}</p>
         </div>
+
+        {sc.executive_narrative && sc.executive_narrative.paragraphs && sc.executive_narrative.paragraphs.length>0 && (
+          <div className="mt-6 bg-white rounded-2xl border border-black/10 p-7 fade">
+            <div className="flex items-center gap-2 mb-3"><span className="w-2.5 h-2.5 bg-royal inline-block"></span><h2 className="text-xs font-bold uppercase tracking-widest">Executive summary</h2></div>
+            {sc.executive_narrative.headline && <p className="display text-2xl font-bold leading-snug mb-4">{sc.executive_narrative.headline}</p>}
+            <div className="space-y-3 text-[15px] leading-relaxed text-midnight">
+              {sc.executive_narrative.paragraphs.map((t,k)=><p key={k}>{t}</p>)}
+            </div>
+          </div>
+        )}
 
         {sc.id ? (
           <div className="mt-5 bg-white rounded-2xl border border-black/10 p-5 flex flex-wrap items-center gap-3">

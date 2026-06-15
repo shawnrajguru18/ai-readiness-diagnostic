@@ -12,7 +12,7 @@ from ..content import quick_wins_by_id
 from ..models import (
     Submission, PersonaInference, PersonaResult, DimensionScore, Finding,
     RecommendedNextStep, SelectedQuickWin, SynthesisResult, QuickWinResult,
-    ValidationOutput, ValidationResult, ValidationFlag,
+    ValidationOutput, ValidationResult, ValidationFlag, ExecutiveNarrative, Scorecard,
 )
 
 # ---- DXC AdvisoryX voice guard (Companion 04 D1) ----
@@ -244,6 +244,103 @@ def _c3_llm_refine(sub, dims, candidates, deterministic):
             ordering_priority=i + 1, selection_confidence=pick.selection_confidence,
         ))
     return out or deterministic
+
+
+# ======================================================================
+# C4 — Executive narrative summary (persona-framed prose)
+# ======================================================================
+C4_SYS = (
+    "You are the executive-summary writer for the DXC AI Readiness Diagnostic. Given an assembled "
+    "scorecard (overall score and tier, six dimension scores, peer benchmarks, findings, quick wins, "
+    "and the recommended next step), write a short narrative summary for the primary persona. "
+    "P1 Executive sponsor: competitive position, the board narrative, where the company can lead. "
+    "P2 Operational owner: implementation, architecture, governance feasibility, the path to production. "
+    "P3 Financial scrutineer: return, capital allocation, value at stake, financial risk. "
+    "Return a headline (one sentence) and 4-5 short paragraphs (2-4 sentences each): where they stand "
+    "versus peers, the strongest foundation, the binding constraint, the near-term path, and the "
+    "strategic move. Be specific to this prospect; reference real scores and names. Never state tier "
+    "thresholds as numbers. " + VOICE + " Return JSON only."
+)
+
+
+def _peer_overall_graded(sc: Scorecard, graded: list[DimensionScore]):
+    gp = [sc.peer_benchmarks[d.dimension] for d in graded if d.dimension in (sc.peer_benchmarks or {})]
+    return round(sum(gp) / len(gp)) if gp else None
+
+
+def c4_narrative(sub: Submission, persona: PersonaInference, sc: Scorecard) -> ExecutiveNarrative:
+    if llm_available():
+        from ..llm import parse_structured
+        user = (f"Prospect: {sc.company_name} | Industry: {sc.industry_label} | "
+                f"Primary persona: {persona.primary_persona} ({persona.framing_preference})\n\n"
+                f"Overall: {sc.overall_score}/100 {sc.overall_tier}. {sc.peer_reference}\n"
+                f"Dimensions:\n{_scores_text(sc.dimensions)}\n\n"
+                f"Findings: {json.dumps([{'h': f.headline, 'b': f.body} for f in sc.findings])[:1800]}\n"
+                f"Quick wins: {json.dumps([{'n': q.pattern_name, 'o': q.expected_outcome_range} for q in sc.quick_wins])}\n"
+                f"Recommended next step: {sc.recommended_next_step.body} ({sc.recommended_next_step.duration_estimate_weeks})\n\n"
+                "Write the headline and paragraphs.")
+        try:
+            r: ExecutiveNarrative = parse_structured(C4_SYS, [{"role": "user", "content": user}],
+                                                     ExecutiveNarrative, model=settings.model_opus, max_tokens=4000)
+            if r.paragraphs:
+                return r
+        except Exception:
+            pass
+    return _narrative_fallback(sub, persona, sc)
+
+
+def _narrative_fallback(sub: Submission, persona: PersonaInference, sc: Scorecard) -> ExecutiveNarrative:
+    company = sc.company_name
+    graded = [d for d in sc.dimensions if not d.informational]
+    if not graded:
+        return ExecutiveNarrative(headline=f"{company} AI readiness summary",
+                                  paragraphs=[f"{company} is at the {sc.overall_tier} stage, scoring {sc.overall_score} of 100."])
+    strongest = max(graded, key=lambda d: d.score)
+    weakest = min(graded, key=lambda d: d.score)
+    peer = _peer_overall_graded(sc, graded)
+    pos = ""
+    if peer is not None:
+        diff = sc.overall_score - peer
+        pos = (f", {abs(diff)} points {'ahead of' if diff > 0 else 'behind' if diff < 0 else 'in line with'} "
+               f"the peer average of {peer}") if diff else f", in line with the peer average of {peer}"
+    qw = sc.quick_wins[:3]
+    qw_names = ", ".join(q.pattern_name for q in qw) or "the operational patterns identified"
+    qw_outcomes = "; ".join(f"{q.pattern_name} ({q.expected_outcome_range})" for q in qw if q.expected_outcome_range)
+    rec = sc.recommended_next_step
+    rec_body = rec.body or "a scoped Discovery engagement."
+    p = persona.primary_persona
+    stand = f"{company} is at the {sc.overall_tier} stage of AI readiness, scoring {sc.overall_score} of 100{pos}."
+
+    if p == "P3":
+        headline = (f"{company} is at the {sc.overall_tier} stage of AI readiness, with near-term payback available "
+                    f"and the larger value gated by {weakest.label.lower()}.")
+        paras = [
+            f"{stand} The relevant question for capital allocation is where investment converts to return fastest, and where risk is concentrated.",
+            f"{strongest.label} ({strongest.score} of 100) is where {company} already holds the assets to capture value at low marginal cost. It is the lowest-risk place to show return.",
+            f"{weakest.label} ({weakest.score} of 100) is the largest source of unrealized return and of governance risk. Spending against AI without closing it would compound cost rather than value.",
+            f"In the next 90 days, {qw_outcomes or qw_names} carry near-term, measurable payback and build the track record a larger investment case rests on.",
+            f"The structural move is {rec_body} Over {rec.duration_estimate_weeks} it sizes the value pockets and the investment envelope, so the board can allocate against a business case rather than a forecast.",
+        ]
+    elif p == "P2":
+        headline = (f"{company} is at the {sc.overall_tier} stage: real experimentation, with {weakest.label.lower()} "
+                    f"the constraint on scaling to production.")
+        paras = [
+            f"{stand} The priority now is turning experimentation into dependable production capability.",
+            f"{strongest.label} ({strongest.score} of 100) is the most production-ready part of your estate, and the natural place to scale a proven pattern horizontally.",
+            f"{weakest.label} ({weakest.score} of 100) is the binding constraint on scaling safely. Addressing it is prerequisite, not parallel work.",
+            f"In the next 90 days, {qw_names} are high-confidence patterns with documented enterprise deployments that fit your current architecture and prove delivery.",
+            f"The next step is {rec_body} Over {rec.duration_estimate_weeks} it scopes the build sequence and governance design to close the gap and put value pockets into production.",
+        ]
+    else:  # P1
+        headline = f"{company} is at the {sc.overall_tier} stage of AI readiness, with a clear first move to take to the board."
+        paras = [
+            f"{stand} The question for the board is less whether to invest in AI and more where {company} can build a durable advantage first.",
+            f"Your strongest ground is {strongest.label.lower()} ({strongest.score} of 100). It is the credible base for a visible early win, and the easiest part of the story to back.",
+            f"The gap that most limits ambition is {weakest.label.lower()} ({weakest.score} of 100). Until it is closed, AI value stays episodic rather than compounding across the business.",
+            f"In the next 90 days, {qw_names} are high-confidence moves that prove execution and build momentum without committing to a long program.",
+            f"The strategic step is {rec_body} Over {rec.duration_estimate_weeks} it gives the board a sized, sequenced roadmap rather than a list of pilots.",
+        ]
+    return ExecutiveNarrative(headline=headline, paragraphs=paras)
 
 
 # ======================================================================

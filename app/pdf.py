@@ -469,13 +469,15 @@ def build_board_brief_pdf(sc: Scorecard) -> bytes:
         diff = sc.overall_score - peer_o
         pos = (f" — {abs(diff)} points {'ahead of' if diff > 0 else 'behind' if diff < 0 else 'in line with'} "
                f"the peer benchmark")
+    nar = sc.executive_narrative
+    band_right = (nar.headline if nar and nar.headline else
+                  f"{sc.company_name} is at the {sc.overall_tier} stage of AI readiness{pos}. "
+                  + (f"Strongest: {strongest.label}. Priority gap: {weakest.label}." if strongest and weakest else ""))
     band = Table([[
         Paragraph(f"<font size=26><b>{sc.overall_score}</b></font><font size=12 color='#3D3F50'>/100</font><br/>"
                   f"<font size=11 color='#004AAC'><b>{sc.overall_tier}</b> stage of AI readiness</font>",
                   ParagraphStyle("bandl", fontName="Helvetica", textColor=MIDNIGHT, leading=20)),
-        Paragraph(f"<b>{sc.company_name}</b> is at the <b>{sc.overall_tier}</b> stage of AI readiness{pos}. "
-                  + (f"Strongest: {strongest.label}. Priority gap: {weakest.label}." if strongest and weakest else ""),
-                  S["body"]),
+        Paragraph(band_right, S["body"]),
     ]], colWidths=[1.9 * inch, 4.7 * inch])
     band.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "MIDDLE"), ("BOX", (0, 0), (-1, -1), 0.5, LINE),
                               ("BACKGROUND", (0, 0), (0, 0), colors.HexColor("#F7FAFF")),
@@ -485,23 +487,20 @@ def build_board_brief_pdf(sc: Scorecard) -> bytes:
     story.append(band)
     story.append(Spacer(1, 14))
 
+    # Executive summary (C4 narrative, persona-framed)
+    if nar and nar.paragraphs:
+        story.append(Paragraph("EXECUTIVE SUMMARY", S["h2"]))
+        for t in nar.paragraphs:
+            story.append(Paragraph(t, S["body"]))
+            story.append(Spacer(1, 4))
+        story.append(Spacer(1, 6))
+
     # What matters most (top findings, decision-relevance first)
     story.append(Paragraph("WHAT MATTERS MOST", S["h2"]))
     rank = {"high": 0, "medium": 1, "low": 2}
     top = sorted(sc.findings, key=lambda f: rank.get(f.decision_relevance, 1))[:3]
     for i, f in enumerate(top, 1):
         story.append(Paragraph(f"<b>{i}. {f.headline}.</b> {f.body}", S["finding"]))
-    story.append(Spacer(1, 8))
-
-    # Value at stake (qualitative, from quick wins + the gap to close)
-    story.append(Paragraph("VALUE AT STAKE", S["h2"]))
-    near = "; ".join(f"{q.pattern_name} ({q.expected_outcome_range})" for q in sc.quick_wins[:3])
-    story.append(Paragraph(
-        "<b>Near-term:</b> " + (near or "operational quick wins identified in the assessment") + ".", S["small"]))
-    if weakest:
-        story.append(Paragraph(
-            f"<b>Structural:</b> closing the {weakest.label.lower()} gap is the highest-leverage move to lift "
-            "overall readiness and unlock larger reinvention opportunities.", S["small"]))
     story.append(Spacer(1, 8))
 
     # The ask

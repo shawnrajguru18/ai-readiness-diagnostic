@@ -126,6 +126,14 @@ def render_scorecard_html(sc: Scorecard) -> str:
         f'<span class="muted">({q.timeline_to_value})</span></div>' for q in sc.quick_wins
     )
     r = sc.recommended_next_step
+    nar = sc.executive_narrative
+    nar_panel = ""
+    if nar and nar.paragraphs:
+        nar_head = (f'<p style="font-family:\'Playfair Display\',Georgia,serif;color:{MIDNIGHT};'
+                    f'font-size:22px;line-height:1.25;margin:0 0 14px">{nar.headline}</p>' if nar.headline else "")
+        nar_body = "".join(f'<p style="margin:0 0 12px;font-size:15px;color:{MIDNIGHT};line-height:1.6">{t}</p>'
+                           for t in nar.paragraphs)
+        nar_panel = f'<div class="panel"><h2>Executive summary</h2>{nar_head}{nar_body}</div>'
     vd_panel = (f'<div class="panel"><h2>Opportunity map &middot; value vs difficulty</h2>'
                 f'<p class="muted" style="margin:-6px 0 14px">Where each opportunity sits by business value and effort to implement.</p>'
                 f'<div class="vd">{vd_svg}{vd_legend}</div></div>') if vd_svg else ""
@@ -175,6 +183,7 @@ def render_scorecard_html(sc: Scorecard) -> str:
     </div>
   </div>
   <div class="summary">{summary}</div>
+  {nar_panel}
   <div class="grid">
     <div>{_radar(sc)}</div>
     <div style="flex:1;min-width:280px">{bars}

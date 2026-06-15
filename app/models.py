@@ -135,6 +135,12 @@ class ValueDifficultyItem(BaseModel):
     quadrant: str = "high_value_low_difficulty"
 
 
+class ExecutiveNarrative(BaseModel):
+    """Persona-framed prose summary (C4). Also used as the messages.parse() schema."""
+    headline: str = ""
+    paragraphs: list[str] = []
+
+
 class Scorecard(BaseModel):
     company_name: str = ""
     industry_label: str = ""
@@ -149,6 +155,7 @@ class Scorecard(BaseModel):
     recommended_next_step: RecommendedNextStep = RecommendedNextStep()
     quick_wins: list[SelectedQuickWin] = []
     value_difficulty: list[ValueDifficultyItem] = []
+    executive_narrative: ExecutiveNarrative = ExecutiveNarrative()
     partner_attention_flags: list[str] = []
 
 

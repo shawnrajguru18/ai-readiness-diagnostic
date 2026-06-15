@@ -117,6 +117,10 @@ def run_pipeline(session: Session, persona_hint: Optional[str] = None,
     log(f"[C2/C3] overall={overall} ({session.scorecard.overall_tier}); "
         f"{len(findings)} findings, {len(quick_wins)} quick wins")
 
+    # C4 — executive narrative (persona-framed prose; needs the assembled scorecard)
+    session.scorecard.executive_narrative = agents.c4_narrative(sub, session.persona, session.scorecard)
+    log(f"[C4] narrative: {len(session.scorecard.executive_narrative.paragraphs)} paragraph(s)")
+
     # D2 — validation
     session.validation = agents.d2_validate(session.scorecard)
     log(f"[D2] {session.validation.overall_status}; {len(session.validation.flags)} flag(s)")
