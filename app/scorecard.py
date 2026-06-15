@@ -96,12 +96,28 @@ def render_scorecard_html(sc: Scorecard) -> str:
                + (f" The strongest dimension is {strongest.label}; the priority gap is {weakest.label}."
                   if strongest and weakest else ""))
     vd_svg, vd_legend = _vd_svg(sc)
-    rows = "".join(
-        f'<tr><td>{d.label}{" (informational)" if d.informational else ""}</td>'
-        f'<td style="text-align:right;font-weight:700">{d.score}</td>'
-        f'<td><span class="tier" style="background:{TIER_COLORS[d.tier]}">{d.tier}</span></td></tr>'
-        for d in sc.dimensions
-    )
+
+    def _bar(d):
+        peer = sc.peer_benchmarks.get(d.dimension)
+        tick = (f'<span style="position:absolute;left:{peer}%;top:-3px;bottom:-3px;width:2px;'
+                f'background:{MIDNIGHT};border-radius:1px" title="peer average {peer}"></span>'
+                if peer is not None else "")
+        delta = ""
+        if peer is not None and not d.informational:
+            diff = d.score - peer
+            col = "#1f9d55" if diff > 0 else ("#8A867E" if diff == 0 else "#c0392b")
+            delta = (f'<span style="color:{col};font-weight:700"> vs peer {peer} '
+                     f'({"+" if diff>0 else ""}{diff})</span>')
+        return (
+            f'<div style="margin-bottom:13px">'
+            f'<div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px">'
+            f'<span style="font-weight:600;color:{MIDNIGHT}">{d.label}'
+            f'{" · informational" if d.informational else ""}</span>'
+            f'<span style="color:{MIDNIGHT}"><b>{d.score}</b> · {d.tier}{delta}</span></div>'
+            f'<div style="position:relative;height:8px;background:#ECE7E0;border-radius:4px">'
+            f'<div style="width:{d.score}%;height:100%;background:{TIER_COLORS[d.tier]};border-radius:4px"></div>'
+            f'{tick}</div></div>')
+    bars = "".join(_bar(d) for d in sc.dimensions)
     findings = "".join(
         f'<li><b>{f.headline}.</b> {f.body}</li>' for f in sc.findings
     )
@@ -161,7 +177,9 @@ def render_scorecard_html(sc: Scorecard) -> str:
   <div class="summary">{summary}</div>
   <div class="grid">
     <div>{_radar(sc)}</div>
-    <div style="flex:1;min-width:260px"><table>{rows}</table></div>
+    <div style="flex:1;min-width:280px">{bars}
+      <div class="muted" style="font-size:11px;margin-top:6px"><span style="display:inline-block;width:2px;height:10px;background:{MIDNIGHT};vertical-align:middle;margin-right:5px"></span>peer average · {sc.peer_reference}</div>
+    </div>
   </div>
   <div class="panel"><h2>What we found</h2><ul>{findings}</ul></div>
   {vd_panel}

@@ -25,7 +25,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from .content import load_question_pool, load_fixture
 from .models import TIER_COLORS, Session
 from .orchestrator import build_session, run_pipeline
-from .pdf import build_scorecard_pdf, build_quickwins_memo_pdf, build_appendix_pdf
+from .pdf import (build_scorecard_pdf, build_quickwins_memo_pdf, build_appendix_pdf,
+                  build_action_plan_pdf, build_board_brief_pdf)
 
 ROOT = Path(__file__).resolve().parent.parent
 WEB = ROOT / "web"
@@ -188,6 +189,22 @@ def appendix_pdf(sid: str):
     if not rec:
         raise HTTPException(404, "Not found")
     return _pdf_response(rec, build_appendix_pdf, "Findings-Appendix")
+
+
+@app.get("/api/scorecard/{sid}/action-plan.pdf")
+def action_plan_pdf(sid: str):
+    rec = STORE.get(sid)
+    if not rec:
+        raise HTTPException(404, "Not found")
+    return _pdf_response(rec, build_action_plan_pdf, "90-Day-Action-Plan")
+
+
+@app.get("/api/scorecard/{sid}/board-brief.pdf")
+def board_brief_pdf(sid: str):
+    rec = STORE.get(sid)
+    if not rec:
+        raise HTTPException(404, "Not found")
+    return _pdf_response(rec, build_board_brief_pdf, "Board-Brief")
 
 
 # ---------------- static pages ----------------

@@ -66,6 +66,7 @@ const DEMO = {
   assessment_date:"14 June 2026", reviewed_by:"DXC AdvisoryX",
   overall_score:55, overall_tier:"Developing", overall_color:"#FFAE41",
   peer_reference:"Peer average for large US financial services: 58 (n=42)",
+  peer_benchmarks:{data_foundation:62,governance_posture:60,ai_investment_maturity:55,org_change_readiness:54,value_pocket_clarity:56,regulatory_complexity:62},
   dimensions:[
     {dimension:"data_foundation",label:"Data Foundation",score:52,tier:"Developing",color:"#FFAE41",informational:false},
     {dimension:"governance_posture",label:"Governance Posture",score:38,tier:"Emerging",color:"#FFC982",informational:false},
@@ -353,23 +354,32 @@ function Scorecard({sc, onQuickWins, onHome}) {
           <div className="mt-5 bg-white rounded-2xl border border-black/10 p-5 flex flex-wrap items-center gap-3">
             <span className="text-xs font-bold uppercase tracking-widest text-ink mr-1">Your report</span>
             <a download={`AI-Readiness-Scorecard-${sc.company_name}.pdf`} href={`/api/scorecard/${sc.id}/pdf`} className="px-4 py-2 rounded-lg bg-royal text-white text-sm font-semibold hover:bg-[#003a86]">⬇ Scorecard PDF</a>
+            <a download={`Board-Brief-${sc.company_name}.pdf`} href={`/api/scorecard/${sc.id}/board-brief.pdf`} className="px-4 py-2 rounded-lg bg-white border border-midnight/20 text-sm font-semibold hover:border-royal hover:text-royal">⬇ Board brief</a>
+            <a download={`90-Day-Action-Plan-${sc.company_name}.pdf`} href={`/api/scorecard/${sc.id}/action-plan.pdf`} className="px-4 py-2 rounded-lg bg-white border border-midnight/20 text-sm font-semibold hover:border-royal hover:text-royal">⬇ 90-day action plan</a>
             <a download={`Quick-Wins-Memo-${sc.company_name}.pdf`} href={`/api/scorecard/${sc.id}/quickwins.pdf`} className="px-4 py-2 rounded-lg bg-white border border-midnight/20 text-sm font-semibold hover:border-royal hover:text-royal">⬇ Quick-wins memo</a>
             <a download={`Findings-Appendix-${sc.company_name}.pdf`} href={`/api/scorecard/${sc.id}/appendix.pdf`} className="px-4 py-2 rounded-lg bg-white border border-midnight/20 text-sm font-semibold hover:border-royal hover:text-royal">⬇ Findings appendix</a>
           </div>
         ) : (
-          <div className="mt-5 text-sm text-ink bg-white rounded-2xl border border-dashed border-black/20 p-4">Sample preview. Complete an assessment to generate your downloadable report — scorecard, quick-wins memo, and findings appendix.</div>
+          <div className="mt-5 text-sm text-ink bg-white rounded-2xl border border-dashed border-black/20 p-4">Sample preview. Complete an assessment to generate your downloadable report — scorecard, board brief, 90-day action plan, quick-wins memo, and findings appendix.</div>
         )}
 
         <div className="grid md:grid-cols-2 gap-8 items-center mt-8 bg-white rounded-2xl border border-black/10 p-6">
           <div className="flex justify-center"><Radar dims={sc.dimensions} color={sc.overall_color}/></div>
           <div className="space-y-3">
-            {sc.dimensions.map(d=>(
+            {sc.dimensions.map(d=>{
+              const peer=(sc.peer_benchmarks||{})[d.dimension];
+              const diff=peer!=null?d.score-peer:null;
+              const dcol=diff>0?"#1f9d55":(diff===0?"#8A867E":"#c0392b");
+              return (
               <div key={d.dimension}>
                 <div className="flex justify-between text-sm font-semibold"><span>{d.label}{d.informational?<span className="text-ink font-normal"> · informational</span>:""}</span>
-                  <span>{d.score} · <span style={{color:"#0E1020"}}>{d.tier}</span></span></div>
-                <div className="h-2 bg-black/10 rounded mt-1 overflow-hidden"><div className="h-full rounded" style={{width:`${d.score}%`,background:d.color}}/></div>
+                  <span>{d.score} · <span style={{color:"#0E1020"}}>{d.tier}</span>{peer!=null&&!d.informational&&<span style={{color:dcol}}> · vs peer {peer} ({diff>0?"+":""}{diff})</span>}</span></div>
+                <div className="relative h-2 bg-black/10 rounded mt-1"><div className="h-full rounded" style={{width:`${d.score}%`,background:d.color}}/>
+                  {peer!=null&&<span className="absolute top-[-2px] bottom-[-2px] w-0.5 bg-midnight rounded" style={{left:`${peer}%`}} title={`peer average ${peer}`}/>}
+                </div>
               </div>
-            ))}
+            );})}
+            <div className="text-[11px] text-ink flex items-center gap-1.5 pt-1"><span className="inline-block w-0.5 h-2.5 bg-midnight"/> peer average · {sc.peer_reference}</div>
           </div>
         </div>
 

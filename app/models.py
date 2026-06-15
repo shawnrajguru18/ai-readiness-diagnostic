@@ -143,6 +143,7 @@ class Scorecard(BaseModel):
     overall_score: int = 0
     overall_tier: Tier = "Emerging"
     peer_reference: str = ""
+    peer_benchmarks: dict[str, int] = {}   # dimension id -> peer average (0-100)
     dimensions: list[DimensionScore] = []
     findings: list[Finding] = []
     recommended_next_step: RecommendedNextStep = RecommendedNextStep()

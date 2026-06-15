@@ -132,6 +132,27 @@ class Radar(Flowable):
             c.drawCentredString(vx, vy + 3, str(d.score))
 
 
+class PeerBar(Flowable):
+    """A 0-100 track with the prospect's score filled in tier color and a dark
+    tick marking the peer average — the 'you vs peer' bar."""
+    def __init__(self, score: int, peer, tier_hex: str, width: float = 2.6 * inch):
+        super().__init__()
+        self.score = score
+        self.peer = peer
+        self.color = colors.HexColor(tier_hex)
+        self.width = width
+        self.height = 7
+
+    def draw(self):
+        c = self.canv
+        w, h = self.width, 5
+        c.setFillColor(colors.HexColor("#ECE7E0")); c.roundRect(0, 0, w, h, 2, fill=1, stroke=0)
+        c.setFillColor(self.color); c.roundRect(0, 0, max(2, w * self.score / 100), h, 2, fill=1, stroke=0)
+        if self.peer is not None:
+            px = w * self.peer / 100
+            c.setStrokeColor(MIDNIGHT); c.setLineWidth(1.2); c.line(px, -1.5, px, h + 1.5)
+
+
 def build_scorecard_pdf(sc: Scorecard) -> bytes:
     S = _styles()
     buf = io.BytesIO()
@@ -163,13 +184,19 @@ def build_scorecard_pdf(sc: Scorecard) -> bytes:
     radar = Radar(sc.dimensions, tier_hex)
     dim_rows = [[Paragraph(f"<b>{sc.overall_score}</b> &nbsp; <font color='#3D3F50'>{sc.overall_tier}</font>",
                            ParagraphStyle("ov", fontName="Helvetica", fontSize=15, textColor=MIDNIGHT))]]
-    dim_rows.append([Paragraph(sc.peer_reference, S["small"])])
+    dim_rows.append([Paragraph(sc.peer_reference + "  &nbsp;|&nbsp; <font color='#0E1020'>|</font> peer average",
+                               S["small"])])
     for d in sc.dimensions:
-        bar = Table([[ "" ]], colWidths=[d.score / 100 * 1.9 * inch], rowHeights=[5])
-        bar.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, -1), colors.HexColor(TIER_COLORS[d.tier]))]))
+        peer = sc.peer_benchmarks.get(d.dimension)
+        delta = ""
+        if peer is not None and not d.informational:
+            diff = d.score - peer
+            sign = "+" if diff > 0 else ""
+            col = "#1f9d55" if diff > 0 else ("#8A867E" if diff == 0 else "#c0392b")
+            delta = f" &nbsp; vs peer {peer} <font color='{col}'>({sign}{diff})</font>"
         label = Paragraph(f"<b>{d.label}</b> {'<font size=7 color=\"#8A867E\">informational</font>' if d.informational else ''}<br/>"
-                          f"<font size=8 color='#3D3F50'>{d.score} · {d.tier}</font>", S["small"])
-        dim_rows.append([label]); dim_rows.append([bar])
+                          f"<font size=8 color='#3D3F50'>{d.score} · {d.tier}{delta}</font>", S["small"])
+        dim_rows.append([label]); dim_rows.append([PeerBar(d.score, peer, TIER_COLORS[d.tier])])
     right = Table(dim_rows, colWidths=[3.0 * inch])
     right.setStyle(TableStyle([("TOPPADDING", (0, 0), (-1, -1), 1), ("BOTTOMPADDING", (0, 0), (-1, -1), 1),
                                ("LEFTPADDING", (0, 0), (-1, -1), 0)]))
@@ -328,6 +355,180 @@ def save_quickwins_memo_pdf(sc: Scorecard, out_dir: str = "outputs") -> str:
 
 
 # ============================================================
+# 90-Day Action Plan (1 page) — phased 30/60/90 sequencing
+# ============================================================
+def _phase_buckets(quick_wins):
+    """Distribute quick wins across the three 30-day phases, fastest/lowest-effort first."""
+    order = {"Low": 0, "Medium": 1, "High": 2}
+    qs = sorted(quick_wins, key=lambda q: (q.ordering_priority, order.get(q.implementation_effort, 1)))
+    buckets = ([], [], [])
+    per = max(1, -(-len(qs) // 3))   # ceil(n/3) per contiguous group
+    for i, q in enumerate(qs):
+        buckets[min(2, i // per)].append(q)
+    return buckets
+
+
+def build_action_plan_pdf(sc: Scorecard) -> bytes:
+    S = _styles(); buf = io.BytesIO()
+    doc = SimpleDocTemplate(buf, pagesize=LETTER, leftMargin=0.7 * inch, rightMargin=0.7 * inch,
+                            topMargin=0.6 * inch, bottomMargin=0.6 * inch,
+                            title=f"90-Day Action Plan — {sc.company_name}")
+    story = []
+    logo = _logo_flowable()
+    if logo is not None:
+        story += [logo, Spacer(1, 6)]
+    story.append(Paragraph(f"90-DAY ACTION PLAN · {sc.company_name.upper()}", S["eyebrow"]))
+    story.append(Paragraph("Your First 90 Days", S["h1"]))
+    story.append(Paragraph(f"{sc.industry_label} &nbsp;·&nbsp; {sc.assessment_date} &nbsp;·&nbsp; "
+                           f"Reviewed by {sc.reviewed_by}", S["meta"]))
+    story.append(Spacer(1, 8))
+    graded = [d for d in sc.dimensions if not d.informational]
+    weakest = min(graded, key=lambda d: d.score) if graded else None
+    story.append(Paragraph(
+        "A pragmatic sequence to build momentum, prove execution capacity, and tee up the "
+        "strategic roadmap — without waiting on a long program. Each phase is 30 days.", S["body"]))
+    story.append(Spacer(1, 12))
+
+    buckets = _phase_buckets(sc.quick_wins)
+    phases = [
+        ("DAYS 1–30", "Mobilize & prove", "Exec sponsor + delivery lead",
+         "Name an accountable exec sponsor and a delivery lead. Confirm data and access "
+         "prerequisites. Launch the first quick win.", buckets[0],
+         "First win in flight; baseline metrics captured"),
+        ("DAYS 31–60", "Expand & instrument", "Delivery lead + process owners",
+         "Roll out the next pattern(s). Instrument outcomes so value is attributable, not anecdotal.",
+         buckets[1], "Two-plus patterns live; outcome dashboard in place"),
+        ("DAYS 61–90", "Scale & tee up Discovery", "Sponsor + DXC AdvisoryX",
+         "Harden what works, measure realized value, and assemble the board-ready case for the "
+         + (f"recommended next step — addressing the {weakest.label.lower()} gap." if weakest
+            else "recommended next step."),
+         buckets[2], "Value quantified; Discovery scoped and approved"),
+    ]
+    blue = ParagraphStyle("blue", parent=S["h2"], textColor=ROYAL, fontSize=10)
+    for tf, focus, owner, desc, qs, outcome in phases:
+        rows = [
+            [Paragraph(f"{tf} &nbsp; <font color='#0E1020'>· {focus}</font>", blue)],
+            [Paragraph(desc, S["body"])],
+        ]
+        if qs:
+            rows.append([Paragraph("<b>Initiatives:</b> " + "; ".join(
+                f"{q.pattern_name} <font color='#8A867E'>({q.timeline_to_value}, {q.implementation_effort} effort)</font>"
+                for q in qs), S["small"])])
+        rows.append([Paragraph(f"<b>Owner:</b> {owner} &nbsp;&nbsp; <b>Milestone:</b> {outcome}", S["small"])])
+        card = Table(rows, colWidths=[6.6 * inch])
+        card.setStyle(TableStyle([("LINEBEFORE", (0, 0), (0, -1), 3, ROYAL),
+                                  ("LEFTPADDING", (0, 0), (-1, -1), 10),
+                                  ("TOPPADDING", (0, 0), (-1, -1), 2), ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+                                  ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#F7FAFF"))]))
+        story.append(KeepTogether(card)); story.append(Spacer(1, 12))
+
+    r = sc.recommended_next_step
+    story.append(Paragraph(f"After 90 days: {r.body}", S["small"]))
+    story.append(Paragraph(f"Continue the conversation: {r.contact_name} | {r.contact_email}", S["small"]))
+    doc.build(story)
+    return buf.getvalue()
+
+
+def save_action_plan_pdf(sc: Scorecard, out_dir: str = "outputs") -> str:
+    d = Path(out_dir); d.mkdir(parents=True, exist_ok=True)
+    path = d / f"action-plan-{_slug(sc.company_name)}.pdf"
+    path.write_bytes(build_action_plan_pdf(sc))
+    return str(path)
+
+
+# ============================================================
+# Board Brief (1 page) — top-of-house summary for the board
+# ============================================================
+def build_board_brief_pdf(sc: Scorecard) -> bytes:
+    S = _styles(); buf = io.BytesIO()
+    doc = SimpleDocTemplate(buf, pagesize=LETTER, leftMargin=0.7 * inch, rightMargin=0.7 * inch,
+                            topMargin=0.6 * inch, bottomMargin=0.6 * inch,
+                            title=f"Board Brief — {sc.company_name}")
+    story = []
+    logo = _logo_flowable()
+    if logo is not None:
+        story += [logo, Spacer(1, 6)]
+    story.append(Paragraph("AI READINESS · BOARD BRIEF", S["eyebrow"]))
+    story.append(Paragraph(sc.company_name, S["h1"]))
+    story.append(Paragraph(f"{sc.industry_label} &nbsp;·&nbsp; {sc.assessment_date} &nbsp;·&nbsp; "
+                           f"Reviewed by {sc.reviewed_by}", S["meta"]))
+    story.append(Spacer(1, 12))
+
+    graded = [d for d in sc.dimensions if not d.informational]
+    strongest = max(graded, key=lambda d: d.score) if graded else None
+    weakest = min(graded, key=lambda d: d.score) if graded else None
+    peer_o = None
+    if sc.peer_benchmarks and graded:
+        # weighted-ish peer overall: simple average of graded peer benchmarks for the headline
+        gp = [sc.peer_benchmarks[d.dimension] for d in graded if d.dimension in sc.peer_benchmarks]
+        peer_o = round(sum(gp) / len(gp)) if gp else None
+
+    # Headline band: tier + score vs peer
+    pos = ""
+    if peer_o is not None:
+        diff = sc.overall_score - peer_o
+        pos = (f" — {abs(diff)} points {'ahead of' if diff > 0 else 'behind' if diff < 0 else 'in line with'} "
+               f"the peer benchmark")
+    band = Table([[
+        Paragraph(f"<font size=26><b>{sc.overall_score}</b></font><font size=12 color='#3D3F50'>/100</font><br/>"
+                  f"<font size=11 color='#004AAC'><b>{sc.overall_tier}</b> stage of AI readiness</font>",
+                  ParagraphStyle("bandl", fontName="Helvetica", textColor=MIDNIGHT, leading=20)),
+        Paragraph(f"<b>{sc.company_name}</b> is at the <b>{sc.overall_tier}</b> stage of AI readiness{pos}. "
+                  + (f"Strongest: {strongest.label}. Priority gap: {weakest.label}." if strongest and weakest else ""),
+                  S["body"]),
+    ]], colWidths=[1.9 * inch, 4.7 * inch])
+    band.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "MIDDLE"), ("BOX", (0, 0), (-1, -1), 0.5, LINE),
+                              ("BACKGROUND", (0, 0), (0, 0), colors.HexColor("#F7FAFF")),
+                              ("LINEAFTER", (0, 0), (0, 0), 3, ROYAL), ("LEFTPADDING", (0, 0), (-1, -1), 12),
+                              ("RIGHTPADDING", (0, 0), (-1, -1), 12), ("TOPPADDING", (0, 0), (-1, -1), 10),
+                              ("BOTTOMPADDING", (0, 0), (-1, -1), 10)]))
+    story.append(band)
+    story.append(Spacer(1, 14))
+
+    # What matters most (top findings, decision-relevance first)
+    story.append(Paragraph("WHAT MATTERS MOST", S["h2"]))
+    rank = {"high": 0, "medium": 1, "low": 2}
+    top = sorted(sc.findings, key=lambda f: rank.get(f.decision_relevance, 1))[:3]
+    for i, f in enumerate(top, 1):
+        story.append(Paragraph(f"<b>{i}. {f.headline}.</b> {f.body}", S["finding"]))
+    story.append(Spacer(1, 8))
+
+    # Value at stake (qualitative, from quick wins + the gap to close)
+    story.append(Paragraph("VALUE AT STAKE", S["h2"]))
+    near = "; ".join(f"{q.pattern_name} ({q.expected_outcome_range})" for q in sc.quick_wins[:3])
+    story.append(Paragraph(
+        "<b>Near-term:</b> " + (near or "operational quick wins identified in the assessment") + ".", S["small"]))
+    if weakest:
+        story.append(Paragraph(
+            f"<b>Structural:</b> closing the {weakest.label.lower()} gap is the highest-leverage move to lift "
+            "overall readiness and unlock larger reinvention opportunities.", S["small"]))
+    story.append(Spacer(1, 8))
+
+    # The ask
+    r = sc.recommended_next_step
+    ask = Table([[Paragraph("<b>THE ASK</b>", ParagraphStyle("ask", fontName="Helvetica-Bold", fontSize=9,
+                  textColor=ROYAL))],
+                 [Paragraph(r.body, S["body"])],
+                 [Paragraph(f"Duration: {r.duration_estimate_weeks}. Continue the conversation: "
+                            f"{r.contact_name} | {r.contact_email}", S["small"])]],
+                colWidths=[6.6 * inch])
+    ask.setStyle(TableStyle([("LINEBEFORE", (0, 0), (0, -1), 3, ROYAL), ("LEFTPADDING", (0, 0), (-1, -1), 10),
+                             ("TOPPADDING", (0, 0), (-1, -1), 3), ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#F7FAFF"))]))
+    story.append(KeepTogether(ask))
+    story.append(Spacer(1, 10))
+    story.append(Paragraph(f"Confidential — prepared for the board of {sc.company_name}. Prepared by DXC AdvisoryX.", S["small"]))
+    doc.build(story)
+    return buf.getvalue()
+
+
+def save_board_brief_pdf(sc: Scorecard, out_dir: str = "outputs") -> str:
+    d = Path(out_dir); d.mkdir(parents=True, exist_ok=True)
+    path = d / f"board-brief-{_slug(sc.company_name)}.pdf"
+    path.write_bytes(build_board_brief_pdf(sc))
+    return str(path)
+
+
+# ============================================================
 # Findings appendix (tertiary deliverable, 5-8 pages)
 # ============================================================
 def _questionnaire_signals(session, dim: str) -> list[str]:
@@ -424,7 +625,16 @@ def build_appendix_pdf(session) -> bytes:
             story.append(Paragraph("&bull; " + s, S["small"]))
         story.append(Spacer(1, 4))
         story.append(Paragraph(f"<b>Research signals.</b> {_research_text(session.research)}", S["small"]))
-        story.append(Paragraph("<b>Peer comparison.</b> Peer benchmarks are introduced in V0.5+ (placeholder).", S["small"]))
+        peer = sc.peer_benchmarks.get(d.dimension)
+        if peer is None:
+            peer_txt = "Peer benchmark not available for this cohort."
+        else:
+            diff = d.score - peer
+            rel = ("ahead of" if diff > 0 else "behind" if diff < 0 else "in line with")
+            peer_txt = (f"Your score is {d.score} vs a peer average of {peer} — "
+                        f"{abs(diff)} point(s) {rel} the cohort." if diff
+                        else f"Your score is {d.score}, {rel} the peer average of {peer}.")
+        story.append(Paragraph(f"<b>Peer comparison.</b> {peer_txt} <font color='#8A867E'>({sc.peer_reference})</font>", S["small"]))
         story.append(Spacer(1, 4))
         story.append(Paragraph(f"<b>What strong looks like.</b> {g.get('strong','')}", S["body"]))
         if g.get("actions"):

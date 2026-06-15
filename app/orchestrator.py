@@ -42,15 +42,8 @@ def _value_difficulty(quick_wins, dims) -> list[ValueDifficultyItem]:
             value_score=0.9, difficulty_score=0.7, quadrant=_quadrant(0.9, 0.7)))
     return items
 from .scoring import score_dimensions, overall_score, apply_research_adjustments
+from .benchmarks import peer_benchmarks, peer_reference
 from . import agents
-
-# Indicative peer references (V0 placeholder; real benchmarks are V0.5+).
-PEER_REF = {
-    "FS": "Peer average for large US financial services: 58 (n=42)",
-    "HLS": "Peer average for large US health systems: 39 (n=18)",
-    "MFG": "Peer average for large manufacturers: 49 (n=27)",
-    "All": "Peer benchmark library: V0.5+",
-}
 
 
 def build_session(submission: dict, consent: dict, responses: dict,
@@ -112,7 +105,8 @@ def run_pipeline(session: Session, persona_hint: Optional[str] = None,
         assessment_date=assessment_date or datetime.now(timezone.utc).strftime("%d %B %Y"),
         overall_score=overall,
         overall_tier=tier_for(overall),
-        peer_reference=PEER_REF.get(sub.industry_tag, PEER_REF["All"]),
+        peer_reference=peer_reference(sub.industry_tag),
+        peer_benchmarks=peer_benchmarks(sub.industry_tag),
         dimensions=dims,
         findings=findings,
         recommended_next_step=rec,

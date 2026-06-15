@@ -89,6 +89,8 @@ function Detail({d,note,setNote,decide,msg}){
           <div className="display text-4xl font-extrabold">{sc.overall_score}</div>
           <div className="mt-1 flex flex-col items-end gap-0.5 text-xs">
             <a href={`/api/scorecard/${d.id}/pdf`} target="_blank" className="text-royal hover:underline">Scorecard PDF ↗</a>
+            <a href={`/api/scorecard/${d.id}/board-brief.pdf`} target="_blank" className="text-royal hover:underline">Board brief PDF ↗</a>
+            <a href={`/api/scorecard/${d.id}/action-plan.pdf`} target="_blank" className="text-royal hover:underline">90-day action plan PDF ↗</a>
             <a href={`/api/scorecard/${d.id}/quickwins.pdf`} target="_blank" className="text-royal hover:underline">Quick-wins memo PDF ↗</a>
             <a href={`/api/scorecard/${d.id}/appendix.pdf`} target="_blank" className="text-royal hover:underline">Findings appendix PDF ↗</a>
           </div>
