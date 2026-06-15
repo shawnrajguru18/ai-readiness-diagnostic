@@ -40,7 +40,62 @@ def _radar(sc: Scorecard, size=360) -> str:
             f'<polygon points="{you}" fill="{color}55" stroke="{color}" stroke-width="2"/>{labels}</svg>')
 
 
+_QL = {"high_value_low_difficulty": "quick win", "high_value_high_difficulty": "strategic bet",
+       "low_value_low_difficulty": "fill-in", "low_value_high_difficulty": "deprioritize"}
+
+
+def _vd_svg(sc: Scorecard, size: int = 300):
+    """Numbered value-difficulty 2x2 + legend html, matching the React/PDF version."""
+    items = sc.value_difficulty
+    if not items:
+        return "", ""
+    pad = 56
+    s = size
+    counts, idx, pts = {}, {}, []
+    for it in items:
+        key = (round(it.difficulty_score * 10), round(it.value_score * 10))
+        counts[key] = counts.get(key, 0) + 1
+    for i, it in enumerate(items, 1):
+        key = (round(it.difficulty_score * 10), round(it.value_score * 10))
+        k = idx.get(key, 0); idx[key] = k + 1; m = counts[key]
+        dx = dy = 0.0
+        if m > 1:
+            a = 2 * math.pi * k / m; dx = math.cos(a) * 0.055; dy = math.sin(a) * 0.055
+        vx = min(0.92, max(0.08, it.difficulty_score + dx))
+        vy = min(0.92, max(0.08, it.value_score + dy))
+        pts.append((i, it, pad + vx * s, pad + (1 - vy) * s))
+    dots = "".join(
+        f'<circle cx="{x:.0f}" cy="{y:.0f}" r="12" fill="{ROYAL}"/>'
+        f'<text x="{x:.0f}" y="{y + 4:.0f}" font-size="12" font-weight="700" fill="#fff" text-anchor="middle">{i}</text>'
+        for i, it, x, y in pts)
+    svg = (
+        f'<svg width="{s + pad + 16}" height="{s + pad + 30}" viewBox="0 0 {s + pad + 16} {s + pad + 30}">'
+        f'<rect x="{pad}" y="{pad}" width="{s // 2}" height="{s // 2}" fill="#EAF2FF"/>'
+        f'<rect x="{pad}" y="{pad}" width="{s}" height="{s}" fill="none" stroke="#C9C4BC"/>'
+        f'<line x1="{pad + s // 2}" y1="{pad}" x2="{pad + s // 2}" y2="{pad + s}" stroke="#E6E1DA"/>'
+        f'<line x1="{pad}" y1="{pad + s // 2}" x2="{pad + s}" y2="{pad + s // 2}" stroke="#E6E1DA"/>'
+        f'<text x="{pad + 6}" y="{pad + 15}" font-size="10" font-weight="700" fill="{ROYAL}">QUICK WINS</text>'
+        f'<text x="{pad + s - 6}" y="{pad + 15}" font-size="10" font-weight="700" fill="#8A867E" text-anchor="end">STRATEGIC BETS</text>'
+        f'<text x="{pad + 6}" y="{pad + s - 6}" font-size="10" fill="#B7B1A8">FILL-INS</text>'
+        f'<text x="{pad + s - 6}" y="{pad + s - 6}" font-size="10" fill="#B7B1A8" text-anchor="end">DEPRIORITIZE</text>'
+        f'<text x="{pad + s // 2}" y="{pad + s + 22}" font-size="11" fill="{INK}" text-anchor="middle">Implementation difficulty &#8594;</text>'
+        f'<text x="20" y="{pad + s // 2}" font-size="11" fill="{INK}" text-anchor="middle" transform="rotate(-90 20 {pad + s // 2})">Business value &#8594;</text>'
+        f'{dots}</svg>')
+    legend = "".join(
+        f'<li><b>{i}.</b> {it.opportunity} <span class="muted">&middot; {_QL.get(it.quadrant, "")}</span></li>'
+        for i, it, x, y in pts)
+    return svg, f'<ol class="vdlegend">{legend}</ol>'
+
+
 def render_scorecard_html(sc: Scorecard) -> str:
+    graded = [d for d in sc.dimensions if not d.informational]
+    strongest = max(graded, key=lambda d: d.score) if graded else None
+    weakest = min(graded, key=lambda d: d.score) if graded else None
+    summary = (f"{sc.company_name} is at the {sc.overall_tier} stage of AI readiness, scoring "
+               f"{sc.overall_score} of 100."
+               + (f" The strongest dimension is {strongest.label}; the priority gap is {weakest.label}."
+                  if strongest and weakest else ""))
+    vd_svg, vd_legend = _vd_svg(sc)
     rows = "".join(
         f'<tr><td>{d.label}{" (informational)" if d.informational else ""}</td>'
         f'<td style="text-align:right;font-weight:700">{d.score}</td>'
@@ -55,46 +110,67 @@ def render_scorecard_html(sc: Scorecard) -> str:
         f'<span class="muted">({q.timeline_to_value})</span></div>' for q in sc.quick_wins
     )
     r = sc.recommended_next_step
+    vd_panel = (f'<div class="panel"><h2>Opportunity map &middot; value vs difficulty</h2>'
+                f'<p class="muted" style="margin:-6px 0 14px">Where each opportunity sits by business value and effort to implement.</p>'
+                f'<div class="vd">{vd_svg}{vd_legend}</div></div>') if vd_svg else ""
     return f"""<!DOCTYPE html><html><head><meta charset="utf-8">
 <title>AI Readiness Scorecard — {sc.company_name}</title>
 <style>
   body{{font-family:'DM Sans',Arial,sans-serif;background:{CANVAS};color:{INK};margin:0}}
-  .wrap{{max-width:900px;margin:0 auto;padding:40px}}
-  .eyebrow{{letter-spacing:2px;text-transform:uppercase;font-size:11px;color:{MIDNIGHT};font-weight:700}}
-  h1{{font-family:'Playfair Display',Georgia,serif;color:{MIDNIGHT};font-size:30px;margin:6px 0}}
-  .meta{{font-size:12px;color:{INK};margin-bottom:6px}}
-  .grid{{display:flex;gap:28px;flex-wrap:wrap;align-items:center;background:#fff;border:1px solid #E6E1DA;border-radius:14px;padding:24px;margin:18px 0}}
-  .overall{{font-family:'Playfair Display',Georgia,serif;font-size:54px;color:{MIDNIGHT};line-height:1}}
-  .tierbadge{{display:inline-block;padding:4px 12px;border-radius:20px;font-weight:700;font-size:13px}}
+  .wrap{{max-width:920px;margin:0 auto;padding:40px}}
+  .eyebrow{{letter-spacing:2px;text-transform:uppercase;font-size:11px;font-weight:700}}
+  h1{{font-family:'Playfair Display',Georgia,serif;color:{MIDNIGHT};font-size:40px;margin:6px 0 0;line-height:1}}
+  .meta{{font-size:13px;color:{INK}}}
+  .cover{{background:#fff;border:1px solid #E6E1DA;border-top:4px solid {ROYAL};border-radius:16px;padding:28px;display:flex;justify-content:space-between;gap:24px;flex-wrap:wrap}}
+  .reviewed{{font-size:13px;color:{MIDNIGHT};margin-top:8px}} .reviewed b{{color:{MIDNIGHT}}}
+  .overall{{font-family:'Playfair Display',Georgia,serif;font-size:60px;color:{MIDNIGHT};line-height:1}}
+  .overall span{{font-family:'DM Sans',Arial,sans-serif;font-size:20px;color:{INK}}}
+  .tierbadge{{display:inline-block;padding:4px 12px;border-radius:20px;font-weight:700;font-size:13px;color:{MIDNIGHT}}}
+  .summary{{background:#fff;border:1px solid #E6E1DA;border-radius:14px;padding:18px 24px;margin:16px 0;font-size:15px;color:{MIDNIGHT}}}
+  .grid{{display:flex;gap:28px;flex-wrap:wrap;align-items:center;background:#fff;border:1px solid #E6E1DA;border-radius:14px;padding:24px;margin-bottom:18px}}
   .panel{{background:#fff;border:1px solid #E6E1DA;border-radius:14px;padding:24px;margin-bottom:18px}}
   h2{{font-size:12px;letter-spacing:1px;text-transform:uppercase;color:{MIDNIGHT};margin:0 0 12px}}
   table{{width:100%;border-collapse:collapse}} td{{padding:8px 6px;border-bottom:1px solid #EEE9E2;font-size:14px}}
   .tier{{padding:2px 9px;border-radius:20px;font-size:11px;font-weight:700;color:{MIDNIGHT}}}
   ul{{margin:0;padding-left:18px}} li{{margin-bottom:10px;font-size:14px;color:{MIDNIGHT}}}
-  .rec{{border-left:4px solid {ROYAL};background:#fff;padding:16px 18px;border-radius:10px}}
-  .rec h2{{color:{ROYAL}}} .qw{{padding:8px 0;border-bottom:1px solid #EEE9E2;font-size:13px}}
+  .rec{{border-left:4px solid {ROYAL}}} .rec h2{{color:{ROYAL}}}
+  .cta{{display:inline-block;margin-top:12px;padding:10px 18px;border-radius:8px;background:{ROYAL};color:#fff;text-decoration:none;font-weight:700;font-size:13px}}
+  .qw{{padding:8px 0;border-bottom:1px solid #EEE9E2;font-size:13px}}
   .muted{{color:#8A867E}} .qwhead{{color:#9a6a00}}
+  .vd{{display:flex;gap:28px;flex-wrap:wrap;align-items:flex-start}}
+  .vdlegend{{list-style:none;padding:0;margin:0;font-size:13px}} .vdlegend li{{margin-bottom:8px}}
+  .vdlegend b{{display:inline-block;width:20px}}
   .foot{{font-size:11px;color:#8A867E;margin-top:16px}}
 </style></head><body><div class="wrap">
-  <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">{DXC_LOGO}
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">{DXC_LOGO}
     <span style="width:1px;height:16px;background:{MIDNIGHT};opacity:.25"></span>
-    <span class="eyebrow">AdvisoryX · AI Readiness Diagnostic</span></div>
-  <h1>{sc.company_name}</h1>
-  <div class="meta">{sc.industry_label} · {sc.assessment_date} · Reviewed by {sc.reviewed_by}</div>
-  <div class="grid">
-    <div>{_radar(sc)}</div>
+    <span class="eyebrow" style="color:{MIDNIGHT}">AdvisoryX</span></div>
+  <div class="cover">
     <div>
-      <div class="eyebrow">Overall AI readiness</div>
-      <div class="overall">{sc.overall_score}</div>
+      <div class="eyebrow" style="color:{ROYAL}">AI Readiness Diagnostic</div>
+      <h1>{sc.company_name}</h1>
+      <div class="meta" style="margin-top:10px">{sc.industry_label} &middot; {sc.assessment_date}</div>
+      <div class="reviewed"><span style="color:{ROYAL};font-weight:700">&#10003;</span> Reviewed by <b>DXC AdvisoryX</b></div>
+      <div class="meta">{r.contact_name}, {r.contact_title}</div>
+    </div>
+    <div style="text-align:right">
       <span class="tierbadge" style="background:{TIER_COLORS[sc.overall_tier]}">{sc.overall_tier}</span>
-      <div class="meta" style="margin-top:8px">{sc.peer_reference}</div>
+      <div class="overall" style="margin-top:8px">{sc.overall_score}<span> /100</span></div>
+      <div class="meta" style="margin-top:6px;max-width:230px;margin-left:auto">{sc.peer_reference}</div>
     </div>
   </div>
-  <div class="panel"><h2>Dimensions</h2><table>{rows}</table></div>
+  <div class="summary">{summary}</div>
+  <div class="grid">
+    <div>{_radar(sc)}</div>
+    <div style="flex:1;min-width:260px"><table>{rows}</table></div>
+  </div>
   <div class="panel"><h2>What we found</h2><ul>{findings}</ul></div>
+  {vd_panel}
   <div class="panel rec"><h2>Recommended next step</h2>
     <p style="color:{MIDNIGHT};font-size:14px">{r.body}</p>
-    <p class="muted">Duration: {r.duration_estimate_weeks}. Continue the conversation: {r.contact_name}, {r.contact_title} | {r.contact_email}</p>
+    <p class="muted" style="margin-top:6px">Duration: {r.duration_estimate_weeks}.</p>
+    <a class="cta" href="mailto:{r.contact_email}">Continue the conversation &#8594;</a>
+    <p class="muted" style="margin-top:8px">{r.contact_name}, {r.contact_title} &middot; {r.contact_email}</p>
   </div>
   <div class="panel"><h2 class="qwhead">90-day quick wins</h2>{qwins}</div>
   <div class="foot">Confidential — prepared for {sc.company_name}. Prepared by DXC AdvisoryX.</div>
