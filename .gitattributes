@@ -1,0 +1,29 @@
+# Normalize line endings: store text as LF in the repo (stops the CRLF warnings).
+* text=auto eol=lf
+
+# Text formats (kept LF)
+*.py    text eol=lf
+*.md    text eol=lf
+*.txt   text eol=lf
+*.yaml  text eol=lf
+*.yml   text eol=lf
+*.html  text eol=lf
+*.css   text eol=lf
+*.js    text eol=lf
+*.json  text eol=lf
+*.svg   text eol=lf
+*.cfg   text eol=lf
+*.ini   text eol=lf
+
+# Binary assets (no EOL conversion, no text diff)
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.ico   binary
+*.eps   binary
+*.pdf   binary
+*.docx  binary
+*.pptx  binary
+*.xlsx  binary
+*.zip   binary
