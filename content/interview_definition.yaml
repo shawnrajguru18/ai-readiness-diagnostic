@@ -1,0 +1,80 @@
+# =============================================================================
+# PLACEHOLDER — AI Readiness interview definition.
+# Replace the rubric bands and seed questions with the hand-authored content from
+# COMPANION 01. Keep the six objective keys stable (the engine references them).
+# =============================================================================
+interview_type: ai_readiness
+name: AI Readiness
+
+objectives:
+  - key: strategy
+    name: Strategy & Ambition
+    intent: Is AI tied to measurable business outcomes and owned at the top?
+    rubric:
+      L1: "No defined AI ambition; activity is ad hoc."
+      L2: "AI mentioned in strategy but not quantified or owned."
+      L3: "AI linked to specific goals in some units; an owner exists."
+      L4: "Enterprise AI strategy with funded priorities and clear ownership."
+      L5: "AI is a core pillar of the business model with board-level value targets."
+    seed_questions:
+      - "How does AI show up in your corporate strategy today, and who owns the outcomes?"
+
+  - key: data
+    name: Data & Platform
+    intent: Is data accessible, trusted, and ready to fuel AI at scale?
+    rubric:
+      L1: "Siloed, inconsistent data; no governance."
+      L2: "Some consolidation; quality unreliable; governance on paper."
+      L3: "Key domains governed; reusable datasets for some use cases."
+      L4: "Largely unified, governed, accessible; curated pipelines for AI."
+      L5: "Real-time, trusted data products and a self-service AI-ready platform."
+    seed_questions:
+      - "When a team needs data for an AI use case, what does getting it actually look like?"
+
+  - key: technology
+    name: Technology & Architecture
+    intent: Can the architecture deploy, scale, and operate AI reliably?
+    rubric:
+      L1: "No dedicated tooling or reference architecture."
+      L2: "Individual tools; pilots rarely reach production."
+      L3: "A shared platform; a repeatable but heavy path to production."
+      L4: "Standardized MLOps; streamlined deployment for most use cases."
+      L5: "Automated MLOps/LLMOps with CI/CD and monitoring at scale."
+    seed_questions:
+      - "How do AI pilots move from proof-of-concept into production in your environment?"
+
+  - key: process
+    name: Process & Value Realization
+    intent: Are processes reimagined around AI, and is value actually realized?
+    rubric:
+      L1: "Ideas only; AI bolted onto broken processes; no value tracked."
+      L2: "Stuck in POCs; benefits claimed but not verified."
+      L3: "A few production use cases; benefits tracked inconsistently."
+      L4: "Core processes reimagined around AI; benefits largely realized."
+      L5: "AI industrialized across processes; value captured in the P&L."
+    seed_questions:
+      - "Pick a process AI has touched — was it redesigned, or did AI get added on top?"
+
+  - key: people
+    name: People & Operating Model
+    intent: Do people, skills, and the operating model enable AI at scale?
+    rubric:
+      L1: "Significant skill gaps; heavy external reliance; change resisted."
+      L2: "A few specialists; awareness only; no operating model."
+      L3: "Capable pockets; targeted training; some shared assets."
+      L4: "Strong capability; active change management; an AI 'factory'."
+      L5: "Deep AI fluency; federated operating model; outcome-based funding."
+    seed_questions:
+      - "Who actually builds and runs AI in your organization, and how is that funded?"
+
+  - key: governance
+    name: Governance & Responsible AI
+    intent: Are risk, ethics, and compliance built into how you do AI?
+    rubric:
+      L1: "No policies or controls; risk not assessed."
+      L2: "High-level principles only; reactive risk handling."
+      L3: "Guidelines and risk reviews for selected use cases."
+      L4: "A formal framework with review gates and standard risk assessment."
+      L5: "Embedded controls, bias/drift monitoring, audit-ready compliance."
+    seed_questions:
+      - "How do you manage AI risk, bias, and regulatory exposure as usage grows?"

@@ -1,0 +1,294 @@
+# =============================================================================
+# Question Pool — 20 questions across 6 dimensions (Companion 01).
+# Source of truth for deterministic scoring. dimension_weight values sum to 1.0
+# within each dimension. Overall dimension weights live in app/scoring.py.
+# Option scores are 0-100 contributions; dimension score = weighted avg of
+# answered graded questions (renormalized over what was asked, to handle skips).
+# =============================================================================
+version: "1.0"
+tiers:
+  Emerging:    [0, 39]
+  Developing:  [40, 59]
+  Established: [60, 79]
+  Leading:     [80, 100]
+
+dimensions:
+  data_foundation:        { label: "Data Foundation",                weight: 0.20 }
+  governance_posture:     { label: "Governance Posture",             weight: 0.20 }
+  ai_investment_maturity: { label: "AI Investment Maturity",         weight: 0.18 }
+  org_change_readiness:   { label: "Organizational Change Readiness", weight: 0.15 }
+  value_pocket_clarity:   { label: "Value-Pocket Clarity",           weight: 0.17 }
+  regulatory_complexity:  { label: "Regulatory Complexity",          weight: 0.10, informational: true }
+
+questions:
+  # ---------------- Dimension 1: Data Foundation ----------------
+  - id: Q1.1
+    dimension: data_foundation
+    dimension_weight: 0.30
+    type: single_select
+    personas: [P1, P2, P3]
+    industries: [All]
+    text: "Where does your enterprise's operational data primarily live?"
+    options:
+      - { id: A, text: "Fragmented across 20+ systems with limited integration", score: 20 }
+      - { id: B, text: "Several major systems with documented but partial integration", score: 40 }
+      - { id: C, text: "Most operations covered by integrated core platforms", score: 65 }
+      - { id: D, text: "Unified data layer or modern lakehouse architecture in production", score: 90 }
+
+  - id: Q1.2
+    dimension: data_foundation
+    dimension_weight: 0.25
+    type: scale_1_5
+    personas: [P1, P2, P3]
+    industries: [All]
+    text: "What proportion of significant business decisions today are made with current, accurate data?"
+    scale_anchors:
+      - { value: 1, text: "Most decisions rely on dated or incomplete data", score: 15 }
+      - { value: 2, text: "Some decisions have current data; many do not", score: 35 }
+      - { value: 3, text: "Most operational decisions have current data; strategic decisions lag", score: 55 }
+      - { value: 4, text: "Decision-grade data is generally available with effort", score: 75 }
+      - { value: 5, text: "Real-time or near-real-time data drives most decisions", score: 95 }
+
+  - id: Q1.3
+    dimension: data_foundation
+    dimension_weight: 0.25
+    type: single_select
+    personas: [P2, P1]
+    industries: [All]
+    text: "How readily can data be accessed and prepared for AI applications?"
+    options:
+      - { id: A, text: "Each AI project requires significant data engineering to access source systems", score: 25 }
+      - { id: B, text: "Some standard datasets are accessible; new use cases require custom work", score: 45 }
+      - { id: C, text: "A data platform exists that supports most AI use cases with moderate effort", score: 70 }
+      - { id: D, text: "AI teams can self-serve data through governed APIs and feature stores", score: 90 }
+
+  - id: Q1.4
+    dimension: data_foundation
+    dimension_weight: 0.20
+    type: single_select
+    personas: [P1, P2]
+    industries: [All]
+    text: "How would your team describe the current quality of operational data?"
+    options:
+      - { id: A, text: "Significant known data quality issues; no formal quality program", score: 20 }
+      - { id: B, text: "Quality issues acknowledged; ad hoc remediation efforts", score: 40 }
+      - { id: C, text: "Data quality program in place for critical domains", score: 65 }
+      - { id: D, text: "Comprehensive data quality monitoring with ownership and SLAs", score: 85 }
+
+  # ---------------- Dimension 2: Governance Posture ----------------
+  - id: Q2.1
+    dimension: governance_posture
+    dimension_weight: 0.40
+    type: single_select
+    personas: [P1, P2, P3]
+    industries: [All]
+    text: "Does your organization have a defined AI governance framework?"
+    options:
+      - { id: A, text: "No formal AI governance; AI decisions handled case by case", score: 15 }
+      - { id: B, text: "Draft AI principles exist but not operationalized", score: 35 }
+      - { id: C, text: "AI governance framework in place; ownership and controls established", score: 65 }
+      - { id: D, text: "Mature AI governance with risk tiering, monitoring, and board oversight", score: 90 }
+
+  - id: Q2.2
+    dimension: governance_posture
+    dimension_weight: 0.30
+    type: single_select
+    personas: [P1, P3]
+    industries: [All]
+    text: "Who owns AI-related risk decisions in your organization today?"
+    options:
+      - { id: A, text: "No clear owner; risk emerges as issues arise", score: 15 }
+      - { id: B, text: "Distributed across CISO, Compliance, Legal with informal coordination", score: 35 }
+      - { id: C, text: "Designated AI risk owner with cross-functional committee", score: 65 }
+      - { id: D, text: "AI risk integrated into enterprise risk framework with C-suite accountability", score: 90 }
+
+  - id: Q2.3
+    dimension: governance_posture
+    dimension_weight: 0.30
+    type: single_select
+    personas: [P1, P2]
+    industries: [FS, HLS, All]
+    text: "How is your organization interpreting industry-specific AI regulatory guidance?"
+    options:
+      - { id: A, text: "Awareness of guidance exists; interpretation has not started", score: 20 }
+      - { id: B, text: "Active legal and compliance review underway", score: 45 }
+      - { id: C, text: "Operational interpretation complete; controls being implemented", score: 70 }
+      - { id: D, text: "Industry guidance fully operationalized; proactive engagement with regulators", score: 90 }
+
+  # ---------------- Dimension 3: AI Investment Maturity ----------------
+  - id: Q3.1
+    dimension: ai_investment_maturity
+    dimension_weight: 0.30
+    type: single_select
+    personas: [P1, P2, P3]
+    industries: [All]
+    text: "How many distinct AI initiatives has your organization launched in the last 24 months?"
+    options:
+      - { id: A, text: "None or one early-stage pilot", score: 25 }
+      - { id: B, text: "2-5 pilots, mostly experimental", score: 45 }
+      - { id: C, text: "6-15 initiatives at various stages; some in production", score: 70 }
+      - { id: D, text: "15+ initiatives with portfolio governance", score: 85 }
+
+  - id: Q3.2
+    dimension: ai_investment_maturity
+    dimension_weight: 0.30
+    type: single_select
+    personas: [P1, P2]
+    industries: [All]
+    text: "What AI applications are in production today, generating measurable business value?"
+    skip_if: { question: Q3.1, answer_in: [A] }
+    options:
+      - { id: A, text: "Nothing in production; experiments and proofs of concept only", score: 20 }
+      - { id: B, text: "1-2 narrow applications in limited production", score: 45 }
+      - { id: C, text: "Several production applications with measurable value", score: 70 }
+      - { id: D, text: "AI is integral to multiple core business processes", score: 90 }
+
+  - id: Q3.3
+    dimension: ai_investment_maturity
+    dimension_weight: 0.25
+    type: single_select
+    personas: [P3, P1]
+    industries: [All]
+    text: "How would you describe the business outcomes from AI investment to date?"
+    skip_if: { question: Q3.1, answer_in: [A] }
+    options:
+      - { id: A, text: "Hard to point to material outcomes from AI investment yet", score: 25 }
+      - { id: B, text: "Some efficiency gains documented; broader impact unclear", score: 45 }
+      - { id: C, text: "Material outcomes documented in specific business areas", score: 70 }
+      - { id: D, text: "AI is a material driver of business performance with attributable impact", score: 90 }
+
+  - id: Q3.4
+    dimension: ai_investment_maturity
+    dimension_weight: 0.15
+    type: single_select
+    personas: [P3, P1]
+    industries: [All]
+    text: "How is AI investment trending in your organization for the coming year?"
+    options:
+      - { id: A, text: "Reducing or pausing AI investment to focus on data foundations", score: 30 }
+      - { id: B, text: "Holding flat while we evaluate what has worked", score: 50 }
+      - { id: C, text: "Increasing material investment in 2-3 specific AI initiatives", score: 70 }
+      - { id: D, text: "Materially increasing AI investment across multiple business lines", score: 80 }
+
+  # ---------------- Dimension 4: Organizational Change Readiness ----------------
+  - id: Q4.1
+    dimension: org_change_readiness
+    dimension_weight: 0.35
+    type: single_select
+    personas: [P1, P2]
+    industries: [All]
+    text: "How does your organization typically respond to major operational changes?"
+    options:
+      - { id: A, text: "Significant resistance; changes take 2-3x longer than planned", score: 25 }
+      - { id: B, text: "Resistance is expected and managed; changes generally land on time", score: 50 }
+      - { id: C, text: "Strong change management muscle; recent transformations have landed well", score: 75 }
+      - { id: D, text: "Continuous change is the operating norm; teams adapt rapidly", score: 90 }
+
+  - id: Q4.2
+    dimension: org_change_readiness
+    dimension_weight: 0.40
+    type: single_select
+    personas: [P1, P3]
+    industries: [All]
+    text: "How aligned is the senior leadership team on AI ambition and approach?"
+    options:
+      - { id: A, text: "Active debate at the leadership level; no shared direction yet", score: 30 }
+      - { id: B, text: "Leadership broadly supportive; specifics still being shaped", score: 55 }
+      - { id: C, text: "Clear leadership alignment with a defined AI strategy", score: 75 }
+      - { id: D, text: "AI strategy is integrated into business strategy with full board engagement", score: 90 }
+
+  - id: Q4.3
+    dimension: org_change_readiness
+    dimension_weight: 0.25
+    type: single_select
+    personas: [P1, P2]
+    industries: [All]
+    text: "How is your workforce engaging with AI as a topic today?"
+    options:
+      - { id: A, text: "Workforce concerns dominate; cautious or anxious posture", score: 30 }
+      - { id: B, text: "Mixed posture; some teams enthusiastic, others apprehensive", score: 55 }
+      - { id: C, text: "Broadly positive engagement; active use of AI tools by individuals", score: 75 }
+      - { id: D, text: "Workforce is helping define AI strategy and implementation", score: 90 }
+
+  # ---------------- Dimension 5: Value-Pocket Clarity ----------------
+  - id: Q5.1
+    dimension: value_pocket_clarity
+    dimension_weight: 0.40
+    type: single_select
+    personas: [P1, P2, P3]
+    industries: [All]
+    text: "Has your organization identified specific business processes where AI investment is justified?"
+    options:
+      - { id: A, text: "AI ambition is broad; specific processes not yet identified", score: 25 }
+      - { id: B, text: "2-3 candidate processes under evaluation", score: 50 }
+      - { id: C, text: "Portfolio of processes prioritized with business case", score: 75 }
+      - { id: D, text: "AI roadmap maps to enterprise value pockets with sized opportunities", score: 90 }
+
+  - id: Q5.2
+    dimension: value_pocket_clarity
+    dimension_weight: 0.30
+    type: single_select
+    personas: [P3, P1]
+    industries: [All]
+    text: "For AI initiatives, what does success look like?"
+    options:
+      - { id: A, text: "Success defined by adoption or completion, not measurable business outcome", score: 30 }
+      - { id: B, text: "Initiatives have outcome KPIs but ROI attribution is difficult", score: 50 }
+      - { id: C, text: "Initiatives have clear baseline measurement and target outcomes", score: 75 }
+      - { id: D, text: "AI value is tracked in business P&L with attribution methodology", score: 90 }
+
+  - id: Q5.3
+    dimension: value_pocket_clarity
+    dimension_weight: 0.30
+    type: single_select
+    personas: [P1, P2]
+    industries: [All]
+    text: "When considering AI for a business process, how does your organization frame the question?"
+    options:
+      - { id: A, text: "Primarily: How can AI automate this process more efficiently?", score: 35 }
+      - { id: B, text: "Mixed: some automation framing, some process redesign", score: 55 }
+      - { id: C, text: "Primarily: What should this process look like with AI as a participant?", score: 80 }
+      - { id: D, text: "Process reinvention is the default frame; automation follows redesign", score: 95 }
+
+  # ---------------- Dimension 6: Regulatory Complexity (informational) ----------------
+  - id: Q6.1
+    dimension: regulatory_complexity
+    dimension_weight: 0.50
+    type: multi_select
+    personas: [P1, P2]
+    industries: [All]
+    informational: true
+    text: "What regulatory frameworks materially apply to your AI use?"
+    options:
+      - { id: eu_ai_act, text: "EU AI Act (now in force)", complexity: 20 }
+      - { id: us_sectoral, text: "US sectoral guidance (NIST AI RMF, state AG guidance)", complexity: 12 }
+      - { id: fca_pra, text: "FCA / PRA AI guidance (UK financial services)", complexity: 16 }
+      - { id: finra_sec, text: "FINRA / SEC AI disclosure (US capital markets)", complexity: 16 }
+      - { id: hipaa_fda, text: "HIPAA / FDA SaMD (US healthcare)", complexity: 22 }
+      - { id: industry_specific, text: "Industry-specific (state insurance, manufacturing safety, etc.)", complexity: 12 }
+      - { id: none, text: "No specific AI regulation currently applies", complexity: 0 }
+
+  - id: Q6.2
+    dimension: regulatory_complexity
+    dimension_weight: 0.30
+    type: single_select
+    personas: [P1, P2]
+    industries: [All]
+    informational: true
+    branch_if: { question: Q6.1, answer_in: [eu_ai_act, fca_pra, hipaa_fda] }
+    text: "What data sovereignty or residency requirements constrain AI deployment?"
+    options:
+      - { id: A, text: "No specific sovereignty constraints; cloud-flexible", complexity: 5 }
+      - { id: B, text: "Preference for in-region deployment; some flexibility", complexity: 12 }
+      - { id: C, text: "Required in-region data residency; cloud restrictions apply", complexity: 20 }
+      - { id: D, text: "Sovereign AI required (on-premise, sovereign cloud, EU/UK-only models)", complexity: 28 }
+
+  - id: Q6.3
+    dimension: regulatory_complexity
+    dimension_weight: 0.20
+    type: open_short
+    personas: [P1, P2]
+    industries: [All]
+    informational: true
+    open_answer_max_chars: 500
+    text: "How does your AI strategy address cross-border data flow considerations?"

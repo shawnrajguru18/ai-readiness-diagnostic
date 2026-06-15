@@ -1,0 +1,215 @@
+# =============================================================================
+# Quick-Wins Library — 15 patterns (Companion 02). Consumed by Agent C3.
+# Fields per Companion 05 QuickWinPattern.
+# =============================================================================
+version: "1.0"
+patterns:
+  - pattern_id: QW-001
+    name: "Intelligent Invoice Triage"
+    one_line_description: "AI categorizes and routes invoice exceptions, reducing manual AP team workload."
+    what_the_ai_does: "Reads incoming invoice exceptions (mismatch, missing PO, unknown vendor, formatting errors), categorizes them, identifies the likely resolution path, and routes to the right handler with a suggested resolution. Routine cases auto-resolve; complex cases reach humans with context gathered."
+    prerequisites: ["Existing AP system with structured exception logging", "6+ months of historical exception data"]
+    expected_outcomes: "AP exception handling time reduced 40-60%. Routine auto-resolution 25-40%."
+    implementation_effort: Low
+    timeline_to_value_weeks: "8-10 weeks"
+    applicable_industries: [All]
+    applicable_sizes: ["mid-market", "large", "global"]
+    functional_area: finance_ops
+    disqualifying_conditions: ["Highly customized AP workflows", "<2K invoices/month"]
+    peer_examples: ["Manufacturing client, 50K invoices/month, 45% exception reduction in 10 weeks", "FS back-office, 38% auto-resolution in 12 weeks"]
+
+  - pattern_id: QW-002
+    name: "Customer Support Ticket Categorization and Routing"
+    one_line_description: "AI reads inbound customer tickets, categorizes by intent, and routes to the right specialist team."
+    what_the_ai_does: "Parses inbound tickets (email, chat, web form), identifies request type, urgency, and product area, and routes to the team most likely to resolve quickly with extracted context attached."
+    prerequisites: ["Ticketing system with structured data", "Categorization taxonomy mapped to teams"]
+    expected_outcomes: "First-contact resolution +15-25%. Avg resolution time -20-35%."
+    implementation_effort: Low
+    timeline_to_value_weeks: "6-10 weeks"
+    applicable_industries: [All]
+    applicable_sizes: ["large", "global"]
+    functional_area: customer_service
+    disqualifying_conditions: ["Named-agent assignment required", "Ticket volume below 5K/month"]
+    peer_examples: ["FS client, -28% handle time across 200K monthly tickets in 8 weeks", "Healthcare payer, +22% first-contact resolution"]
+
+  - pattern_id: QW-003
+    name: "Contract Clause Extraction"
+    one_line_description: "AI reads incoming contracts, extracts key clauses, and flags non-standard terms for review."
+    what_the_ai_does: "Parses contracts (PDF, Word), extracts standard clauses, compares against templates, and flags deviations as a structured summary for legal triage."
+    prerequisites: ["Standard contract templates documented", "50+ contracts/month"]
+    expected_outcomes: "Legal review time per contract -30-50%. Deviation detection up materially."
+    implementation_effort: Low
+    timeline_to_value_weeks: "8-12 weeks"
+    applicable_industries: [All]
+    applicable_sizes: ["large", "global"]
+    functional_area: legal
+    disqualifying_conditions: ["Highly bespoke contracting", "Legal strongly prefers full manual review"]
+    peer_examples: ["Manufacturing client cut supplier contract review 48h -> 4h", "FS institution improved deviation detection 60% -> 92%"]
+
+  - pattern_id: QW-004
+    name: "Sales Call Summarization and Action Capture"
+    one_line_description: "AI summarizes sales calls, extracts action items, and updates CRM automatically."
+    what_the_ai_does: "Processes recorded sales calls, produces structured summaries with objections and next steps, extracts action items with owners, and updates CRM fields automatically."
+    prerequisites: ["Compliance-cleared call recording", "CRM with API access"]
+    expected_outcomes: "Sales rep admin time -5-8 hours/week. CRM completeness up."
+    implementation_effort: Low
+    timeline_to_value_weeks: "6-10 weeks"
+    applicable_industries: [All]
+    applicable_sizes: ["large", "global"]
+    functional_area: sales
+    disqualifying_conditions: ["Compliance constraints on call recording", "Small sales teams (<50 reps)"]
+    peer_examples: ["Tech services firm, 800 reps, recovered 6h/rep/week", "Insurance broker, CRM completeness 45% -> 89%"]
+
+  - pattern_id: QW-005
+    name: "IT Incident Auto-Categorization"
+    one_line_description: "AI reads inbound IT incident tickets, categorizes by type, and assigns severity and priority."
+    what_the_ai_does: "Processes IT incident tickets, identifies affected service and likely root-cause area, assigns severity by business-impact rules, and routes to the right support tier with diagnostic context."
+    prerequisites: ["ITSM system (ServiceNow, BMC)", "Service catalog documented", "Sufficient ticket history"]
+    expected_outcomes: "Routing accuracy +30-50%. Mean time to assignment -60-80%. Tier-1 deflection +20-35%."
+    implementation_effort: Low
+    timeline_to_value_weeks: "6-10 weeks"
+    applicable_industries: [All]
+    applicable_sizes: ["large", "global"]
+    functional_area: it_ops
+    disqualifying_conditions: ["Very small IT ops (<10K tickets/year)", "Heavily customized ITSM"]
+    peer_examples: ["FS client cut mean time to assignment 38m -> 6m across 400K tickets/yr", "Health system +28% tier-1 deflection in 9 weeks. Strong customer-zero candidate (DXC ServiceNow estate)."]
+
+  - pattern_id: QW-006
+    name: "Knowledge Base Search Enhancement"
+    one_line_description: "AI improves internal knowledge base search, surfacing relevant content from imprecise queries."
+    what_the_ai_does: "Replaces keyword search with semantic understanding, returns the most relevant documents with extracted answer snippets, and learns from which results actually answered the question."
+    prerequisites: ["Existing knowledge base with reasonable content quality", "Permission to index content"]
+    expected_outcomes: "Search success +30-50%. Internal ticket deflection +15-25%."
+    implementation_effort: Low
+    timeline_to_value_weeks: "4-8 weeks"
+    applicable_industries: [All]
+    applicable_sizes: ["mid-market", "large", "global"]
+    functional_area: knowledge
+    disqualifying_conditions: ["Very low-quality KB content", "Heavy reliance on uncaptured tribal knowledge"]
+    peer_examples: ["Insurance back-office +38% question-resolution rate", "Manufacturing engineering KB cut time-to-answer 18m -> 4m"]
+
+  - pattern_id: QW-007
+    name: "Meeting Summarization and Decision Tracking"
+    one_line_description: "AI summarizes meetings, extracts decisions and action items, distributes to attendees automatically."
+    what_the_ai_does: "Processes meeting recordings, produces structured summaries with decisions and owners, and distributes to attendees, optionally creating reminders and updating PM tools."
+    prerequisites: ["Meeting recording/transcription capability", "Email/calendar integration"]
+    expected_outcomes: "Decision follow-through +25-40%. Time saved on minutes and follow-up."
+    implementation_effort: Low
+    timeline_to_value_weeks: "4-8 weeks"
+    applicable_industries: [All]
+    applicable_sizes: ["mid-market", "large", "global"]
+    functional_area: productivity
+    disqualifying_conditions: ["Meeting confidentiality constraints", "Cultural resistance to AI in meetings"]
+    peer_examples: ["Professional services firm saved 4-6h/week per senior staff", "Healthcare ops decision execution 55% -> 81%"]
+
+  - pattern_id: QW-008
+    name: "Expense Report Categorization and Anomaly Detection"
+    one_line_description: "AI categorizes expense reports, flags anomalies for review, accelerates routine approvals."
+    what_the_ai_does: "Processes expense reports, categorizes line items, validates against policy, flags anomalies, and fast-tracks routine reports while routing exceptions to managers. Receipt OCR included."
+    prerequisites: ["Expense management system with API access", "Documented expense policy"]
+    expected_outcomes: "Processing time -60-80%. Better anomaly detection with fewer false positives."
+    implementation_effort: Low
+    timeline_to_value_weeks: "6-10 weeks"
+    applicable_industries: [All]
+    applicable_sizes: ["mid-market", "large", "global"]
+    functional_area: finance_ops
+    disqualifying_conditions: ["Highly bespoke expense workflows", "Full human review of every report required"]
+    peer_examples: ["FS firm -40% expense processing FTE across 30K reports/month", "Manufacturing policy-violation detection 45% -> 87%"]
+
+  - pattern_id: QW-009
+    name: "Sales Prospect Research Automation"
+    one_line_description: "AI researches prospect companies before sales calls, prepares briefing documents automatically."
+    what_the_ai_does: "Given a prospect or meeting invite, researches public information, synthesizes a one-page briefing, and delivers it to the rep before the meeting."
+    prerequisites: ["CRM with meeting data accessible", "Public research API access"]
+    expected_outcomes: "Meeting prep time -70-85%. Higher conversion on prospect calls."
+    implementation_effort: Low
+    timeline_to_value_weeks: "4-8 weeks"
+    applicable_industries: [All]
+    applicable_sizes: ["large", "global"]
+    functional_area: sales
+    disqualifying_conditions: ["Non-research-intensive sales models", "Small sales teams"]
+    peer_examples: ["Enterprise software firm cut prep 45m -> 8m/meeting", "Professional services +18% first-meeting conversion"]
+
+  - pattern_id: QW-010
+    name: "Code Review Assistant"
+    one_line_description: "AI reviews pull requests for quality, security, and style before human reviewers see them."
+    what_the_ai_does: "Reviews PRs against coding standards, flags bugs, security issues, style violations, and missing tests with inline comments; human reviewers see only what AI could not resolve."
+    prerequisites: ["Modern source control with PR workflow", "Defined coding standards"]
+    expected_outcomes: "Pre-review issue detection 60-80%. Reviewer time per PR -30-50%."
+    implementation_effort: Low
+    timeline_to_value_weeks: "4-8 weeks"
+    applicable_industries: [All]
+    applicable_sizes: ["mid-market", "large", "global"]
+    functional_area: engineering
+    disqualifying_conditions: ["Very small engineering teams (<10 devs)", "Legacy without modern PR workflows"]
+    peer_examples: ["FS engineering team cut PR cycle 36h -> 12h across 500 PRs/week", "Manufacturing software +67% security issue detection"]
+
+  - pattern_id: QW-011
+    name: "Recruiting Candidate Screening"
+    one_line_description: "AI screens incoming candidate applications against role requirements, surfaces strongest matches first."
+    what_the_ai_does: "Reads resumes, scores match across explicit and inferred criteria, surfaces strongest candidates with reasoning, and flags diverse candidates for explicit human review."
+    prerequisites: ["ATS with API access", "Well-defined job requirements"]
+    expected_outcomes: "Recruiter time per role -40-60%. Time-to-shortlist from weeks to days."
+    implementation_effort: Medium
+    timeline_to_value_weeks: "10-14 weeks"
+    applicable_industries: [All]
+    applicable_sizes: ["large", "global"]
+    functional_area: hr
+    disqualifying_conditions: ["High-volume entry-level keyword-sufficient hiring", "Bias-sensitive contexts requiring documented human-led screening"]
+    peer_examples: ["FS firm time-to-shortlist 18d -> 4d on technical roles", "Health system improved diverse candidate progression while -50% screening time"]
+
+  - pattern_id: QW-012
+    name: "Compliance Document Review"
+    one_line_description: "AI reads regulatory documents, flags compliance issues for review."
+    what_the_ai_does: "Processes outbound regulatory documents, checks against current rules and policy library, flags potential issues with rationale, and prioritizes by risk."
+    prerequisites: ["Document management system", "Current regulatory rule library", "Internal policy library"]
+    expected_outcomes: "Review coverage up materially. Issue detection +30-50%."
+    implementation_effort: Medium
+    timeline_to_value_weeks: "10-14 weeks"
+    applicable_industries: [FS, HLS, MFG]
+    applicable_sizes: ["large", "global"]
+    functional_area: compliance
+    disqualifying_conditions: ["Very small compliance volumes", "Bespoke environments where false positives create more work"]
+    peer_examples: ["FS compliance coverage 15% -> 80% of customer comms, +23% issues detected", "Pharma -40% manual adverse-event review burden"]
+
+  - pattern_id: QW-013
+    name: "Marketing Copy Variant Generation"
+    one_line_description: "AI generates marketing copy variants for testing, accelerating A/B testing throughput."
+    what_the_ai_does: "Given an objective and brand voice, generates copy variants for emails, landing pages, and ads; winning patterns inform future generations with compliance enforced at generation time."
+    prerequisites: ["Marketing automation with A/B testing", "Documented brand voice and compliance guidelines"]
+    expected_outcomes: "Variant production 5-10x. A/B cycle time -50-70%."
+    implementation_effort: Low
+    timeline_to_value_weeks: "4-8 weeks"
+    applicable_industries: [All]
+    applicable_sizes: ["large", "global"]
+    functional_area: marketing
+    disqualifying_conditions: ["Highly regulated marketing requiring per-variant review", "Very small marketing teams"]
+    peer_examples: ["Insurance carrier +23% email performance via expanded testing", "Consumer banking +18% web conversion over 6 months"]
+
+  - pattern_id: QW-014
+    name: "Product Description Generation (E-commerce)"
+    one_line_description: "AI generates product descriptions from structured product data, accelerating catalog expansion."
+    what_the_ai_does: "Takes structured product data, generates brand-voice descriptions with SEO optimization in multiple languages, and maintains consistency across the catalog."
+    prerequisites: ["Structured product data (PIM)", "Brand voice guidelines", "SEO requirements documented"]
+    expected_outcomes: "Catalog velocity 5-10x. Translation cost -60-80%."
+    implementation_effort: Low
+    timeline_to_value_weeks: "4-8 weeks"
+    applicable_industries: [MFG, All]
+    applicable_sizes: ["mid-market", "large", "global"]
+    functional_area: marketing
+    disqualifying_conditions: ["Small catalogs (<500 products)", "Bespoke products requiring craft descriptions"]
+    peer_examples: ["Consumer electronics retailer 5K -> 30K SKUs in 6 months", "Apparel brand translation cost $40K -> $6K per market"]
+
+  - pattern_id: QW-015
+    name: "Field Service Report Standardization"
+    one_line_description: "AI processes field technician reports, structures the data, identifies emerging issues across the fleet."
+    what_the_ai_does: "Takes free-text or photo field reports, extracts structured information, identifies fleet-wide patterns (recurring issues, parts clusters), and surfaces insights to operations and engineering."
+    prerequisites: ["Field service management system", "Technicians submitting reports", "Asset master data"]
+    expected_outcomes: "Report processing -80-95%. Pattern detection months earlier."
+    implementation_effort: Medium
+    timeline_to_value_weeks: "10-14 weeks"
+    applicable_industries: [MFG, HLS, All]
+    applicable_sizes: ["large", "global"]
+    functional_area: field_ops
+    disqualifying_conditions: ["Very small field operations (<50 technicians)", "Industries without recurring asset maintenance"]
+    peer_examples: ["Industrial equipment maker detected gearbox failure 4 months early, saved $12M warranty", "Medical device firm cut field report processing 6h -> 15m/tech/week"]

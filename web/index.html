@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>DXC AI Readiness Diagnostic</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;700;800&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    theme: { extend: {
+      colors: {
+        midnight:"#0E1020", canvas:"#F6F3F0", ink:"#3D3F50",
+        peach:"#FFC982", gold:"#FFAE41", melon:"#FF7E51", risk:"#D14600",
+        sky:"#A1E6FF", trueblue:"#4995FF", royal:"#004AAC",
+      },
+      fontFamily: { display:["'Playfair Display'","Georgia","serif"], body:["'DM Sans'","Arial","sans-serif"] },
+    }},
+  }
+</script>
+<style> body{font-family:'DM Sans',Arial,sans-serif;background:#F6F3F0;color:#0E1020} .display{font-family:'Playfair Display',Georgia,serif}
+  @keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}} .fade{animation:fadeUp .4s ease}
+  @keyframes spin{to{transform:rotate(360deg)}} .spin{animation:spin 1.6s linear infinite}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel" data-presets="react">
+const { useState, useEffect } = React;
+const API = ""; // same-origin when served by FastAPI; empty -> offline demo fallback
+
+/* ElevenLabs voice interview. Default is a live DXC voice agent; replace with one
+   configured for THIS questionnaire so it calls the client tools record_answer +
+   finish_interview (contract below) to auto-score. Agent must be Public and allow this origin. */
+const ELEVENLABS_AGENT_ID = "agent_2801ksn2g1w4f8q950snp6pc62mf";
+const TIER_COLOR = { Emerging:"#FFC982", Developing:"#FFAE41", Established:"#A1E6FF", Leading:"#4995FF" };
+
+/* Official DXC brand mark (from DXC Logo/Brand Mark). Recolors via currentColor. */
+const DXC_PATH="M220.055 60.7583C252.905 60.7583 279.643 87.4387 279.644 120.247C279.644 153.055 252.905 179.735 220.055 179.735H61V155.455H220.055C239.522 155.455 255.362 139.657 255.362 120.247C255.362 100.836 239.522 85.0396 220.055 85.0396H61V60.7583H220.055ZM798 85.0386H638.945C619.478 85.0386 603.638 100.836 603.638 120.247C603.638 139.657 619.478 155.454 638.945 155.454H798V179.735H638.945C606.08 179.735 579.357 153.054 579.356 120.247C579.356 87.4387 606.095 60.7573 638.945 60.7573H798V85.0386ZM556.104 85.0386C530.11 85.0387 511.856 96.5366 492.531 108.706C486.261 112.662 479.906 116.647 473.278 120.204C479.905 123.76 486.261 127.744 492.531 131.701C511.856 143.87 530.11 155.368 556.104 155.368V179.649C523.097 179.649 499.987 165.095 479.591 152.254C462.637 141.585 447.997 132.358 430.058 132.358C412.118 132.358 397.478 141.571 380.524 152.254C360.128 165.095 337.018 179.649 304.011 179.649V155.368C330.006 155.368 348.259 143.87 367.584 131.701C373.854 127.744 380.211 123.76 386.838 120.204C380.211 116.647 373.854 112.662 367.584 108.706C348.259 96.5366 330.006 85.0386 304.011 85.0386V60.7573C337.018 60.7573 360.128 75.3119 380.524 88.1665C397.478 98.8358 412.118 108.063 430.058 108.063V108.048C447.997 108.048 462.637 98.8364 479.591 88.1528C499.987 75.3125 523.097 60.7575 556.104 60.7573V85.0386Z";
+const DxcLogo=({h=22,className=""})=>(
+  <svg viewBox="0 0 860 240" height={h} style={{width:(860/240)*h,display:"block"}} className={className} role="img" aria-label="DXC">
+    <path d={DXC_PATH} fill="currentColor"/>
+  </svg>
+);
+const Wordmark=({onDark=false})=>(
+  <div className={`flex items-center gap-2.5 ${onDark?"text-white":"text-midnight"}`}>
+    <DxcLogo h={20}/>
+    <span className="w-px h-4 bg-current opacity-25"></span>
+    <span className={`text-sm font-semibold ${onDark?"text-white/80":"text-ink"}`}>AdvisoryX</span>
+  </div>
+);
+
+/* ---------------- Embedded MeridianFS demo (offline fallback / instant sample) ---------------- */
+const DEMO = {
+  company_name:"MeridianFS Holdings, Inc.", industry_label:"Financial services",
+  assessment_date:"14 June 2026", reviewed_by:"Chris Bryson, Senior Partner, DXC AdvisoryX",
+  overall_score:55, overall_tier:"Developing", overall_color:"#FFAE41",
+  peer_reference:"Peer average for large US financial services: 58 (n=42)",
+  dimensions:[
+    {dimension:"data_foundation",label:"Data Foundation",score:52,tier:"Developing",color:"#FFAE41",informational:false},
+    {dimension:"governance_posture",label:"Governance Posture",score:38,tier:"Emerging",color:"#FFC982",informational:false},
+    {dimension:"ai_investment_maturity",label:"AI Investment Maturity",score:62,tier:"Established",color:"#A1E6FF",informational:false},
+    {dimension:"org_change_readiness",label:"Organizational Change Readiness",score:55,tier:"Developing",color:"#FFAE41",informational:false},
+    {dimension:"value_pocket_clarity",label:"Value-Pocket Clarity",score:48,tier:"Developing",color:"#FFAE41",informational:false},
+    {dimension:"regulatory_complexity",label:"Regulatory Complexity",score:72,tier:"Established",color:"#A1E6FF",informational:true},
+  ],
+  findings:[
+    {finding_id:"F1",headline:"Substantial experimentation, weak production conversion",body:"MeridianFS has launched 15+ AI initiatives over 24 months, but the production conversion rate trails large-FS peers by approximately 30%. The gap concentrates in initiatives that lacked clear value-pocket definition at scoping."},
+    {finding_id:"F2",headline:"Governance is the largest dimensional gap",body:"AI risk ownership is distributed across CISO, Compliance, and Legal without an integrating accountability layer. FCA AI guidance interpretation is underway but not operationalized."},
+    {finding_id:"F3",headline:"Operational processes are the strongest near-term path",body:"AP, IT incident management, and customer support already show measurable AI value in production. Scaling these patterns horizontally is a high-confidence path."},
+  ],
+  recommended_next_step:{body:"APR Discovery engagement focused on claims adjudication reinvention and operational AI scaling. The Discovery would size value pockets across claims sub-processes, design governance integration, and produce a board-ready 18-month roadmap.",duration_estimate_weeks:"6-10 weeks",contact_name:"Chris Bryson",contact_title:"Senior Partner",contact_email:"christopher.bryson@dxc.com"},
+  quick_wins:[
+    {pattern_name:"Intelligent Invoice Triage",one_line_description:"AI categorizes and routes invoice exceptions, reducing manual AP workload.",what_this_would_do:"Auto-resolve routine AP exceptions and route complex cases with context, freeing the AP team for vendor management.",prerequisites_you_have:["AP system with structured exception logging","6+ months of exception history"],expected_outcome_range:"AP exception handling time -40-60%",timeline_to_value:"8-10 weeks",implementation_effort:"Low"},
+    {pattern_name:"IT Incident Auto-Categorization",one_line_description:"AI categorizes IT incidents, assigns severity, routes to the right tier.",what_this_would_do:"Cut mean-time-to-assignment and lift tier-1 deflection across your ServiceNow estate.",prerequisites_you_have:["ITSM system","Service catalog documented"],expected_outcome_range:"Mean time to assignment -60-80%",timeline_to_value:"6-10 weeks",implementation_effort:"Low"},
+    {pattern_name:"Compliance Document Review",one_line_description:"AI reads regulatory documents and flags compliance issues for review.",what_this_would_do:"Lift compliance review coverage of customer communications while catching more issues, directly addressing the governance gap.",prerequisites_you_have:["Document management system","Internal policy library"],expected_outcome_range:"Issue detection +30-50%",timeline_to_value:"10-14 weeks",implementation_effort:"Medium"},
+  ],
+  value_difficulty:[
+    {opportunity:"Intelligent Invoice Triage",value_score:0.7,difficulty_score:0.3,quadrant:"high_value_low_difficulty"},
+    {opportunity:"IT Incident Auto-Categorization",value_score:0.7,difficulty_score:0.3,quadrant:"high_value_low_difficulty"},
+    {opportunity:"Compliance Document Review",value_score:0.7,difficulty_score:0.6,quadrant:"high_value_high_difficulty"},
+    {opportunity:"Close the governance posture gap",value_score:0.9,difficulty_score:0.7,quadrant:"high_value_high_difficulty"},
+  ],
+};
+
+/* ---------------- Hexagonal radar (custom SVG, the signature visual) ---------------- */
+function Radar({dims, color, size=360}) {
+  const n = dims.length, cx=size/2, cy=size/2, R=size*0.34;
+  const pt=(i,frac)=>{const a=(2*Math.PI*i/n)-Math.PI/2;return [cx+R*frac*Math.cos(a),cy+R*frac*Math.sin(a)];};
+  const ring=t=>dims.map((_,i)=>pt(i,t).join(",")).join(" ");
+  const you=dims.map((d,i)=>pt(i,d.score/100).join(",")).join(" ");
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="fade">
+      {[0.25,0.5,0.75,1].map((t,k)=><polygon key={k} points={ring(t)} fill="none" stroke="#D9D5CE" strokeWidth="1"/>)}
+      {dims.map((_,i)=>{const[x,y]=pt(i,1);return <line key={i} x1={cx} y1={cy} x2={x} y2={y} stroke="#E6E1DA"/>;})}
+      <polygon points={you} fill={color+"55"} stroke={color} strokeWidth="2.5"/>
+      {dims.map((d,i)=>{const[x,y]=pt(i,d.score/100);return <circle key={i} cx={x} cy={y} r="3.5" fill={color} stroke="#0E1020" strokeWidth="1"/>;})}
+      {dims.map((d,i)=>{const[x,y]=pt(i,1.17);const anchor=Math.abs(x-cx)<14?"middle":(x>cx?"start":"end");
+        return <text key={i} x={x} y={y} fontSize="11" fontWeight="600" fill="#0E1020" textAnchor={anchor} dominantBaseline="middle">{d.label.split(" & ")[0]}</text>;})}
+      {dims.map((d,i)=>{const[x,y]=pt(i,d.score/100);return <text key={"s"+i} x={x} y={y-9} fontSize="11" fontWeight="700" fill="#0E1020" textAnchor="middle">{d.score}</text>;})}
+    </svg>
+  );
+}
+
+/* Value-difficulty 2x2 (light scatter; priority = high value, low difficulty) */
+function Vd2x2({items, size=300}){
+  if(!items || !items.length) return null;
+  const pad=46, s=size;
+  const X=(d)=>pad + Math.max(.05,Math.min(.95,d))*s;
+  const Y=(v)=>pad + (1-Math.max(.05,Math.min(.95,v)))*s;
+  return (
+    <svg width={s+pad*1.6} height={s+pad*1.3} viewBox={`0 0 ${s+pad*1.6} ${s+pad*1.3}`} role="img" aria-label="Value vs difficulty">
+      <rect x={pad} y={pad} width={s/2} height={s/2} fill="#EAF2FF"/>
+      <rect x={pad} y={pad} width={s} height={s} fill="none" stroke="#E6E1DA"/>
+      <line x1={pad+s/2} y1={pad} x2={pad+s/2} y2={pad+s} stroke="#E6E1DA"/>
+      <line x1={pad} y1={pad+s/2} x2={pad+s} y2={pad+s/2} stroke="#E6E1DA"/>
+      <text x={pad+6} y={pad+14} fontSize="10" fontWeight="700" fill="#004AAC">PRIORITY</text>
+      <text x={pad} y={pad+s+16} fontSize="10" fill="#3D3F50">Low difficulty</text>
+      <text x={pad+s} y={pad+s+16} fontSize="10" fill="#3D3F50" textAnchor="end">High difficulty</text>
+      <text x={18} y={pad+6} fontSize="10" fill="#3D3F50" transform={`rotate(-90 18 ${pad+6})`}>High value</text>
+      <text x={18} y={pad+s} fontSize="10" fill="#3D3F50" textAnchor="end" transform={`rotate(-90 18 ${pad+s})`}>Low value</text>
+      {items.map((it,i)=>(
+        <g key={i}><circle cx={X(it.difficulty_score)} cy={Y(it.value_score)} r="5" fill="#004AAC"/>
+          <text x={X(it.difficulty_score)+8} y={Y(it.value_score)+3} fontSize="10.5" fill="#0E1020">{it.opportunity}</text></g>
+      ))}
+    </svg>
+  );
+}
+
+const Btn=({children,onClick,kind="primary",className=""})=>{
+  const base="px-6 py-3 rounded-lg font-semibold transition focus:outline-none focus:ring-2 focus:ring-royal/40";
+  const k={primary:"bg-royal text-white hover:bg-[#003a86]",ghost:"bg-transparent text-midnight border border-midnight/20 hover:border-midnight/50",
+           light:"bg-white text-midnight border border-black/10 hover:border-black/30"}[kind];
+  return <button onClick={onClick} className={`${base} ${k} ${className}`}>{children}</button>;
+};
+const tierBadge=(t)=>(<span className="px-3 py-1 rounded-full text-xs font-bold text-midnight" style={{background:TIER_COLOR[t]}}>{t}</span>);
+
+/* ---------------- Screen 1: Landing / Intake ---------------- */
+function Landing({onBegin, onVoice, onSample}) {
+  const [f,setF]=useState({prospect_name:"",prospect_role:"",prospect_email:"",company_name_raw:"",industry_tag:"FS",size_band:"large"});
+  const [c,setC]=useState({c2_anonymized_benchmark:true,c4_cross_practice_sharing:false});
+  const set=(k)=>(e)=>setF({...f,[k]:e.target.value});
+  const indLabel={FS:"Financial services",HLS:"Healthcare and life sciences",MFG:"Manufacturing",All:"Other / cross-industry"};
+  return (
+    <div className="min-h-screen bg-canvas text-midnight">
+      <div className="max-w-6xl mx-auto px-8 py-6 flex justify-between items-center">
+        <Wordmark/>
+        <span className="text-xs text-ink uppercase tracking-widest">AI Readiness Diagnostic</span>
+      </div>
+      <div className="max-w-6xl mx-auto px-8 grid md:grid-cols-2 gap-16 items-center pt-10 pb-24">
+        <div className="fade">
+          <h1 className="display text-5xl md:text-6xl leading-tight font-extrabold">Know where you stand on AI. In 30 minutes.</h1>
+          <p className="mt-6 text-lg text-ink max-w-md">DXC returns a peer-benchmarked AI readiness scorecard within 24 hours. No consultant required.</p>
+          <div className="mt-8 flex flex-wrap gap-x-8 gap-y-3 text-sm text-ink">
+            <span>✓ Reviewed by a DXC senior partner before delivery</span>
+            <span>✓ 24-hour turnaround</span>
+            <span>✓ Used by enterprises in 18 countries</span>
+          </div>
+          <button onClick={onSample} className="mt-8 text-trueblue text-sm font-semibold hover:underline">See a sample scorecard →</button>
+        </div>
+        <div className="bg-white text-midnight rounded-2xl p-8 shadow-xl border border-black/5 fade">
+          <h2 className="display text-2xl font-bold mb-5">Begin your assessment</h2>
+          <div className="space-y-3">
+            {[["prospect_name","Full name"],["prospect_role","Role title"],["prospect_email","Business email"],["company_name_raw","Company name"]].map(([k,ph])=>(
+              <input key={k} value={f[k]} onChange={set(k)} placeholder={ph}
+                className="w-full px-4 py-3 rounded-lg border border-black/15 focus:border-royal focus:outline-none text-[15px]"/>
+            ))}
+            <div className="grid grid-cols-2 gap-3">
+              <select value={f.industry_tag} onChange={set("industry_tag")} className="px-3 py-3 rounded-lg border border-black/15 text-[15px]">
+                {Object.entries(indLabel).map(([k,v])=><option key={k} value={k}>{v}</option>)}
+              </select>
+              <select value={f.size_band} onChange={set("size_band")} className="px-3 py-3 rounded-lg border border-black/15 text-[15px]">
+                <option value="mid-market">Mid-market</option><option value="large">Large enterprise</option><option value="global">Global</option>
+              </select>
+            </div>
+          </div>
+          <div className="mt-5 space-y-2 text-[13px] text-ink">
+            <label className="flex items-center gap-2 opacity-70"><input type="checkbox" checked readOnly/> Use my data to produce my scorecard (required)</label>
+            <label className="flex items-center gap-2"><input type="checkbox" checked={c.c2_anonymized_benchmark} onChange={e=>setC({...c,c2_anonymized_benchmark:e.target.checked})}/> Contribute anonymized data to the AdvisoryX peer benchmark library</label>
+            <label className="flex items-center gap-2"><input type="checkbox" checked={c.c4_cross_practice_sharing} onChange={e=>setC({...c,c4_cross_practice_sharing:e.target.checked})}/> Share with DXC teams for relationship follow-up</label>
+          </div>
+          <button onClick={()=>onBegin({...f,industry_label:indLabel[f.industry_tag]},c)}
+            disabled={!f.company_name_raw}
+            className="mt-6 w-full bg-royal text-white py-3 rounded-lg font-semibold hover:bg-[#003a86] disabled:opacity-40">Begin assessment by chat →</button>
+          <div className="flex items-center gap-3 my-3 text-[11px] text-ink/60 uppercase tracking-widest"><span className="h-px flex-1 bg-black/10"></span>or<span className="h-px flex-1 bg-black/10"></span></div>
+          <button onClick={()=>onVoice({...f,industry_label:indLabel[f.industry_tag]},c)}
+            disabled={!f.company_name_raw}
+            className="w-full bg-white text-midnight border border-midnight/20 hover:border-royal hover:text-royal py-3 rounded-lg font-semibold disabled:opacity-40 flex items-center justify-center gap-2">
+            <span aria-hidden="true">🎙️</span> Take it by voice</button>
+          <p className="mt-3 text-[12px] text-ink/70">Speak with the DXC AI interviewer; it guides you through the six dimensions conversationally.</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ---------------- Screen 2: Questionnaire ---------------- */
+function Assessment({pool, onSubmit, onBack, onVoice, initialAnswers}) {
+  const all = pool ? pool.questions : [];
+  const dimLabels = pool ? pool.dimensions : {};
+  const [answers,setAnswers]=useState(initialAnswers||{});
+  const visible = all.filter(q=>{
+    if(q.skip_if){const r=answers[q.skip_if.question];const v=r&&r.option_id;if(v&&q.skip_if.answer_in.includes(v))return false;}
+    if(q.branch_if){const r=answers[q.branch_if.question];const sel=(r&&r.option_ids)||[];if(!sel.some(x=>q.branch_if.answer_in.includes(x)))return false;}
+    return true;
+  });
+  const [i,setI]=useState(0);
+  const q = visible[Math.min(i,visible.length-1)];
+  if(!q) return null;
+  const pos = i+1, total=visible.length;
+  const dimName=(dimLabels[q.dimension]&&dimLabels[q.dimension].label)||q.dimension;
+  const dimQ = visible.filter(x=>x.dimension===q.dimension);
+  const dimIdx = dimQ.indexOf(q)+1;
+  const ans=answers[q.id]||{};
+  const setAns=(v)=>setAnswers({...answers,[q.id]:v});
+  const answered=()=>{ if(q.type==="single_select")return!!ans.option_id; if(q.type==="scale_1_5")return ans.scale_value!=null;
+    if(q.type==="multi_select")return(ans.option_ids||[]).length>0; if(q.type==="open_short")return true; return false; };
+  const next=()=>{ if(i+1>=total){onSubmit(answers);} else setI(i+1); };
+  const minsLeft=Math.max(1,Math.round((total-i)*1.1));
+  return (
+    <div className="min-h-screen bg-canvas">
+      <div className="max-w-3xl mx-auto px-6 py-6 flex justify-between items-center"><Wordmark/>
+        <div className="flex items-center gap-4">
+          {onVoice && <button onClick={()=>onVoice(answers)} className="text-xs font-semibold text-royal hover:underline flex items-center gap-1"><span aria-hidden="true">🎙️</span> Switch to voice</button>}
+          <span className="text-xs text-ink">~{minsLeft} min left</span>
+        </div></div>
+      <div className="max-w-3xl mx-auto px-6">
+        <div className="flex items-center justify-between text-sm font-semibold text-midnight mb-2">
+          <span>{dimName} · {dimIdx} of {dimQ.length}</span><span className="text-ink">{pos}/{total}</span></div>
+        <div className="h-1.5 bg-black/10 rounded-full overflow-hidden mb-10"><div className="h-full bg-royal transition-all" style={{width:`${(pos/total)*100}%`}}/></div>
+        <div className="fade" key={q.id}>
+          <h2 className="display text-3xl font-bold leading-snug mb-8">{q.text}</h2>
+          {q.type==="single_select" && (
+            <div className="space-y-3">{q.options.map(o=>(
+              <button key={o.id} onClick={()=>setAns({option_id:o.id})}
+                className={`w-full text-left px-5 py-4 rounded-xl border-2 transition ${ans.option_id===o.id?"border-royal bg-royal/5":"border-black/10 bg-white hover:border-black/25"}`}>{o.text}</button>
+            ))}</div>)}
+          {q.type==="scale_1_5" && (
+            <div><div className="grid grid-cols-5 gap-2">{q.scale_anchors.map(a=>(
+              <button key={a.value} onClick={()=>setAns({scale_value:a.value})}
+                className={`py-5 rounded-xl border-2 font-bold text-lg ${ans.scale_value===a.value?"border-royal bg-royal/5":"border-black/10 bg-white hover:border-black/25"}`}>{a.value}</button>
+            ))}</div>
+            <div className="flex justify-between text-xs text-ink mt-2"><span>{q.scale_anchors[0].text}</span><span className="text-right">{q.scale_anchors[4].text}</span></div>
+            {ans.scale_value!=null && <p className="text-sm text-ink mt-3">{q.scale_anchors.find(a=>a.value===ans.scale_value).text}</p>}</div>)}
+          {q.type==="multi_select" && (
+            <div className="space-y-3">{q.options.map(o=>{const sel=(ans.option_ids||[]).includes(o.id);
+              return <button key={o.id} onClick={()=>{let s=new Set(ans.option_ids||[]);sel?s.delete(o.id):s.add(o.id);setAns({option_ids:[...s]});}}
+                className={`w-full text-left px-5 py-3.5 rounded-xl border-2 flex items-center gap-3 ${sel?"border-royal bg-royal/5":"border-black/10 bg-white hover:border-black/25"}`}>
+                <span className={`w-4 h-4 rounded border ${sel?"bg-royal border-royal":"border-black/30"}`}></span>{o.text}</button>;})}</div>)}
+          {q.type==="open_short" && (
+            <div><textarea maxLength={q.open_answer_max_chars||500} value={ans.text||""} onChange={e=>setAns({text:e.target.value})}
+              rows={4} className="w-full p-4 rounded-xl border-2 border-black/10 focus:border-royal focus:outline-none"/>
+            <div className="text-xs text-ink text-right mt-1">{(q.open_answer_max_chars||500)-((ans.text||"").length)} characters left</div></div>)}
+        </div>
+        <div className="flex justify-between mt-10 pb-16">
+          <Btn kind="ghost" onClick={()=>i===0?onBack():setI(i-1)}>← Back</Btn>
+          <Btn onClick={next} className={!answered()?"opacity-40 pointer-events-none":""}>{i+1>=total?"Submit assessment":"Next →"}</Btn>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ---------------- Screen 3: Submitted ---------------- */
+function Submitted({company,email,onView}) {
+  return (
+    <div className="min-h-screen bg-canvas flex flex-col">
+      <div className="max-w-3xl mx-auto w-full px-6 py-6"><Wordmark/></div>
+      <div className="max-w-2xl mx-auto px-6 flex-1 flex flex-col justify-center pb-24 fade">
+        <div className="w-12 h-12 rounded-full border-2 border-royal border-t-transparent spin mb-8"></div>
+        <h1 className="display text-4xl font-bold">Your assessment is submitted.</h1>
+        <p className="text-ink mt-3">Here is what happens next.</p>
+        <ol className="mt-8 space-y-4">
+          {[`AI agents research ${company||"your company"} — financials, news, tech posture`,
+            "Our synthesis engine scores your readiness across six dimensions",
+            "A DXC senior partner reviews and approves your scorecard"].map((s,k)=>(
+            <li key={k} className="flex gap-4 items-start"><span className="bg-midnight text-white w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold flex-none">{k+1}</span><span className="pt-1">{s}</span></li>
+          ))}
+        </ol>
+        <p className="mt-8 text-ink">You'll receive your scorecard within 24 hours at <b className="text-midnight">{email||"your email"}</b>. A personal portal link will arrive with your results.</p>
+        <div className="mt-8"><Btn onClick={onView}>Preview your scorecard →</Btn></div>
+      </div>
+    </div>
+  );
+}
+
+/* ---------------- Screen 4: Scorecard ---------------- */
+function Scorecard({sc, onQuickWins}) {
+  return (
+    <div className="min-h-screen bg-canvas">
+      <div className="max-w-5xl mx-auto px-8 py-6 flex justify-between items-center"><Wordmark/>
+        <span className="text-xs text-ink uppercase tracking-widest">AI Readiness Scorecard</span></div>
+      <div className="max-w-5xl mx-auto px-8 pb-24">
+        <div className="flex flex-wrap justify-between items-start gap-4 border-b border-black/10 pb-6">
+          <div><div className="text-xs uppercase tracking-widest text-ink">AI Readiness Diagnostic</div>
+            <h1 className="display text-4xl font-extrabold mt-1">{sc.company_name}</h1>
+            <div className="text-sm text-ink mt-1">{sc.industry_label} · {sc.assessment_date}</div>
+            <div className="text-sm text-ink">Reviewed by {sc.reviewed_by}</div></div>
+          <div className="text-right">{tierBadge(sc.overall_tier)}
+            <div className="display text-6xl font-extrabold mt-2 leading-none">{sc.overall_score}</div>
+            <div className="text-xs text-ink mt-1 max-w-[220px]">{sc.peer_reference}</div></div>
+        </div>
+
+        <div className="grid md:grid-cols-2 gap-8 items-center mt-8 bg-white rounded-2xl border border-black/10 p-6">
+          <div className="flex justify-center"><Radar dims={sc.dimensions} color={sc.overall_color}/></div>
+          <div className="space-y-3">
+            {sc.dimensions.map(d=>(
+              <div key={d.dimension}>
+                <div className="flex justify-between text-sm font-semibold"><span>{d.label}{d.informational?<span className="text-ink font-normal"> · informational</span>:""}</span>
+                  <span>{d.score} · <span style={{color:"#0E1020"}}>{d.tier}</span></span></div>
+                <div className="h-2 bg-black/10 rounded mt-1 overflow-hidden"><div className="h-full rounded" style={{width:`${d.score}%`,background:d.color}}/></div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="mt-8 bg-white rounded-2xl border border-black/10 p-7">
+          <div className="flex items-center gap-2 mb-4"><span className="w-2.5 h-2.5 bg-royal inline-block"></span><h2 className="text-xs font-bold uppercase tracking-widest">What we found</h2></div>
+          <ol className="space-y-4">{sc.findings.map((f,k)=>(
+            <li key={f.finding_id} className="flex gap-3"><span className="font-bold text-royal">{k+1}</span>
+              <span className="text-[15px] leading-relaxed"><b>{f.headline}.</b> {f.body}</span></li>))}</ol>
+        </div>
+
+        <div className="grid md:grid-cols-2 gap-6 mt-6">
+          <div className="bg-white rounded-2xl border-l-4 border-royal p-6">
+            <h2 className="text-xs font-bold uppercase tracking-widest text-royal mb-2">Recommended next step</h2>
+            <p className="text-[15px] leading-relaxed">{sc.recommended_next_step.body}</p>
+            <p className="text-sm text-ink mt-3">Duration: {sc.recommended_next_step.duration_estimate_weeks}.</p>
+            <a href={`mailto:${sc.recommended_next_step.contact_email}`} className="inline-block mt-3 text-royal font-semibold hover:underline">
+              Continue the conversation → {sc.recommended_next_step.contact_name}, {sc.recommended_next_step.contact_title}</a>
+          </div>
+          <div className="bg-white rounded-2xl border border-black/10 p-6">
+            <h2 className="text-xs font-bold uppercase tracking-widest mb-3" style={{color:"#9a6a00"}}>90-day quick wins</h2>
+            <ul className="space-y-2">{sc.quick_wins.map((q,k)=>(
+              <li key={k} className="text-sm"><b>{q.pattern_name}</b> — {q.one_line_description} <span className="text-ink">({q.timeline_to_value})</span></li>))}</ul>
+            <button onClick={onQuickWins} className="mt-4 text-royal font-semibold hover:underline text-sm">View full quick wins memo →</button>
+          </div>
+        </div>
+        {sc.value_difficulty && sc.value_difficulty.length>0 && (
+          <div className="mt-6 bg-white rounded-2xl border border-black/10 p-6">
+            <h2 className="text-xs font-bold uppercase tracking-widest mb-3">Opportunity map · value vs difficulty</h2>
+            <div className="flex justify-center"><Vd2x2 items={sc.value_difficulty}/></div>
+          </div>
+        )}
+
+        {sc.id && (
+          <div className="mt-8 flex flex-wrap gap-3">
+            <a href={`/api/scorecard/${sc.id}/pdf`} target="_blank" className="px-4 py-2 rounded-lg bg-royal text-white text-sm font-semibold hover:bg-[#003a86]">Download scorecard PDF</a>
+            <a href={`/api/scorecard/${sc.id}/quickwins.pdf`} target="_blank" className="px-4 py-2 rounded-lg bg-white border border-midnight/20 text-sm font-semibold hover:border-royal hover:text-royal">Quick-wins memo PDF</a>
+            <a href={`/api/scorecard/${sc.id}/appendix.pdf`} target="_blank" className="px-4 py-2 rounded-lg bg-white border border-midnight/20 text-sm font-semibold hover:border-royal hover:text-royal">Findings appendix PDF</a>
+          </div>
+        )}
+        <div className="text-xs text-ink mt-8">Confidential — prepared for {sc.company_name}. Prepared by DXC AdvisoryX.</div>
+      </div>
+    </div>
+  );
+}
+
+/* ---------------- Screen 5: Quick wins memo ---------------- */
+function QuickWins({sc, onBack}) {
+  return (
+    <div className="min-h-screen bg-canvas">
+      <div className="max-w-4xl mx-auto px-8 py-6 flex justify-between items-center"><Wordmark/>
+        <button onClick={onBack} className="text-sm text-royal font-semibold hover:underline">← Back to scorecard</button></div>
+      <div className="max-w-4xl mx-auto px-8 pb-24">
+        <div className="text-xs uppercase tracking-widest" style={{color:"#9a6a00"}}>90-day quick wins</div>
+        <h1 className="display text-4xl font-extrabold mt-1">{sc.company_name}</h1>
+        <p className="text-ink mt-3 max-w-2xl">Quick wins are AI patterns you can put in production in 90 days or less. Each has documented enterprise deployments with measurable results. They build momentum and prove execution capacity while the strategic roadmap takes shape through Discovery.</p>
+        <div className="grid md:grid-cols-3 gap-5 mt-8">
+          {sc.quick_wins.map((q,k)=>(
+            <div key={k} className="bg-white rounded-2xl border border-black/10 p-6">
+              <span className="w-2.5 h-2.5 bg-royal inline-block mb-3"></span>
+              <h3 className="display text-xl font-bold">{q.pattern_name}</h3>
+              <p className="text-sm italic text-ink mt-1">{q.one_line_description}</p>
+              <p className="text-sm mt-4"><b>What this would do:</b> {q.what_this_would_do}</p>
+              <p className="text-sm mt-3 font-semibold">Prerequisites you have:</p>
+              <ul className="text-sm text-ink mt-1 space-y-1">{(q.prerequisites_you_have||[]).map((p,j)=><li key={j}>✓ {p}</li>)}</ul>
+              <div className="mt-4 text-sm"><b>Expected outcome:</b> {q.expected_outcome_range}</div>
+              <div className="mt-1 text-sm"><b>Timeline:</b> {q.timeline_to_value} · <b>Effort:</b> {q.implementation_effort}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ---------------- Screen 2b: Voice interview (ElevenLabs) ----------------
+   The agent should be configured to call two client tools as it runs the interview:
+     record_answer({question_id, option_id})   // e.g. {"question_id":"Q1.1","option_id":"B"}
+       (or {question_id, scale_value} for 1-5 questions)
+     finish_interview()                          // ends -> scores -> shows the scorecard
+   These are registered on the widget below. Without that agent config, the prospect can
+   still talk to the interviewer, then click "See my scorecard". */
+function VoiceInterview({company, industry, priorAnswers, onFinish, onChat, onBack}) {
+  const collected = React.useRef({...(priorAnswers||{})});
+  const [count, setCount] = useState(Object.keys(priorAnswers||{}).length);
+  const configured = ELEVENLABS_AGENT_ID && !/REPLACE_WITH/.test(ELEVENLABS_AGENT_ID);
+  useEffect(()=>{
+    if(!configured) return;
+    if(!document.getElementById("convai-lib")){
+      const s=document.createElement("script"); s.id="convai-lib"; s.async=true;
+      s.src="https://unpkg.com/@elevenlabs/convai-widget-embed"; document.body.appendChild(s);
+    }
+    const el=document.getElementById("convai-el");
+    if(!el) return;
+    const onCall=(e)=>{ try{
+      e.detail.config.clientTools = {
+        record_answer:(p={})=>{ const{question_id,option_id,scale_value,option_ids}=p;
+          if(question_id){ collected.current[question_id]={option_id,scale_value,option_ids}; setCount(Object.keys(collected.current).length);} return "recorded"; },
+        finish_interview:()=>{ onFinish(collected.current); return "completed"; },
+      };
+      e.detail.config.dynamicVariables = { company_name: company||"", industry: industry||"", already_answered: Object.keys(collected.current).join(", ")||"none" };
+    }catch(err){} };
+    el.addEventListener("elevenlabs-convai:call", onCall);
+    return ()=>el.removeEventListener("elevenlabs-convai:call", onCall);
+  },[]);
+  return (
+    <div className="min-h-screen bg-canvas text-midnight">
+      <div className="max-w-3xl mx-auto px-6 py-6 flex justify-between items-center"><Wordmark/>
+        <button onClick={onBack} className="text-sm text-royal font-semibold hover:underline">← Back</button></div>
+      <div className="max-w-2xl mx-auto px-6 pb-24 fade">
+        <div className="text-xs uppercase tracking-widest text-royal font-bold">Voice interview</div>
+        <h1 className="display text-4xl font-extrabold mt-1">Talk it through.</h1>
+        <p className="text-ink mt-3">The DXC AI interviewer will guide {company||"you"} through the six readiness dimensions by voice. Speak naturally; it adapts and asks follow-ups. When you finish, we score it and show your scorecard.</p>
+        <ol className="mt-6 space-y-2 text-sm text-ink">
+          <li>1. Tap the voice assistant in the bottom-right corner and allow microphone access.</li>
+          <li>2. Answer in your own words across all six dimensions.</li>
+          <li>3. Say “I’m done”, or click below, to generate your scorecard.</li>
+        </ol>
+        {!configured && (
+          <div className="mt-6 p-4 rounded-xl border border-risk/40 bg-risk/5 text-sm">
+            Voice agent not configured. Add an ElevenLabs <code>ELEVENLABS_AGENT_ID</code> in the page, or take it by chat.
+          </div>
+        )}
+        {configured && count>0 && <div className="mt-6 text-sm text-royal font-semibold">{count} of 20 answers captured by voice.</div>}
+        <div className="mt-8 flex flex-wrap gap-3">
+          <Btn onClick={()=>onFinish(collected.current)}>See my scorecard →</Btn>
+          <Btn kind="ghost" onClick={()=>onChat(collected.current)}>Switch to chat instead</Btn>
+        </div>
+        <p className="mt-4 text-[12px] text-ink/60">Note: the voice agent must be Public and allow this site's origin in ElevenLabs. The corner widget is the live agent.</p>
+      </div>
+      {configured && <elevenlabs-convai id="convai-el" agent-id={ELEVENLABS_AGENT_ID}></elevenlabs-convai>}
+    </div>
+  );
+}
+
+/* ---------------- App shell ---------------- */
+function App() {
+  const [screen,setScreen]=useState("landing");
+  const [pool,setPool]=useState(null);
+  const [sc,setSc]=useState(DEMO);
+  const [ctx,setCtx]=useState({});
+  const [answers,setAnswers]=useState({});   // shared between chat + voice
+  const [loading,setLoading]=useState(false);
+
+  useEffect(()=>{ fetch(API+"/api/questions").then(r=>r.json()).then(setPool).catch(()=>setPool(null)); },[]);
+
+  const begin=(f,c)=>{ setCtx({f,c}); if(!pool){ /* offline: skip to demo scorecard */ setSc(DEMO); setScreen("submitted"); return;} setScreen("assessment"); };
+  const voice=(f,c)=>{ setCtx({f,c}); setAnswers({}); setScreen("voice"); };
+  const voiceFinish=(answers)=>{ if(answers && Object.keys(answers).length){ submit(answers); } else { setSc(DEMO); setScreen("submitted"); } };
+  const submit=(answers)=>{
+    setLoading(true);
+    const responses={}; Object.entries(answers).forEach(([k,v])=>responses[k]=v);
+    const body={submission:ctx.f, consent:{c1_use_for_scorecard:true, ...(ctx.c||{})}, responses, persona_hint:null};
+    fetch(API+"/api/assess",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)})
+      .then(r=>r.json()).then(d=>{setSc(d);setLoading(false);setScreen("submitted");})
+      .catch(()=>{setSc(DEMO);setLoading(false);setScreen("submitted");});
+  };
+
+  if(screen==="landing") return <Landing onBegin={begin} onVoice={voice} onSample={()=>{setSc(DEMO);setScreen("scorecard");}}/>;
+  if(screen==="assessment") return <Assessment pool={pool} initialAnswers={answers} onSubmit={submit} onBack={()=>setScreen("landing")} onVoice={(a)=>{setAnswers(a||{});setScreen("voice");}}/>;
+  if(screen==="voice") return <VoiceInterview company={ctx.f&&ctx.f.company_name_raw} industry={ctx.f&&ctx.f.industry_label} priorAnswers={answers} onFinish={voiceFinish} onChat={(a)=>{setAnswers(a||{});setScreen(pool?"assessment":"landing");}} onBack={()=>setScreen("landing")}/>;
+  if(screen==="submitted") return <Submitted company={(ctx.f&&ctx.f.company_name_raw)||sc.company_name} email={ctx.f&&ctx.f.prospect_email} onView={()=>setScreen("scorecard")}/>;
+  if(screen==="scorecard") return <Scorecard sc={sc} onQuickWins={()=>setScreen("quickwins")}/>;
+  if(screen==="quickwins") return <QuickWins sc={sc} onBack={()=>setScreen("scorecard")}/>;
+  return null;
+}
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>

@@ -1,0 +1,37 @@
+# AurelianTech Solutions — mid-market tech services (Companion 03).
+# Strong AI posture, governance gap. Targets: Data 78, Gov 42, AI 75, Org 80, Value 70, Reg 35.
+submission:
+  prospect_name: "Marco Reyes"
+  prospect_role: "Chief Technology Officer"
+  prospect_email: "marco.reyes@aureliantech.com"
+  company_name_raw: "AurelianTech Solutions"
+  industry_label: "Technology services"
+  industry_tag: "All"
+  size_band: "mid-market"
+  hq_country: "US"
+  submission_source: "test"
+consent:
+  c1_use_for_scorecard: true
+  c2_anonymized_benchmark: true
+persona_hint: "P2"
+responses:
+  Q1.1: { option_id: C }
+  Q1.2: { scale_value: 4 }
+  Q1.3: { option_id: D }
+  Q1.4: { option_id: D }
+  Q2.1: { option_id: B }
+  Q2.2: { option_id: C }
+  Q2.3: { option_id: A }
+  Q3.1: { option_id: D }
+  Q3.2: { option_id: C }
+  Q3.3: { option_id: C }
+  Q3.4: { option_id: D }
+  Q4.1: { option_id: C }
+  Q4.2: { option_id: D }
+  Q4.3: { option_id: C }
+  Q5.1: { option_id: C }
+  Q5.2: { option_id: B }
+  Q5.3: { option_id: C }
+  Q6.1: { option_ids: [us_sectoral, eu_ai_act] }
+  Q6.2: { option_id: A }
+  Q6.3: { text: "Cloud-flexible; monitoring EU AI Act exposure for EU customers." }

@@ -1,0 +1,21 @@
+# Secrets
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+
+# Generated artifacts
+outputs/
+*.pdf
+
+# OS / editor
+.DS_Store
+Thumbs.db
+
+# Env files (keep any keys out of git)
+.env.*

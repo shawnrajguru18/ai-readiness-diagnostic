@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Partner Review — DXC AI Readiness Diagnostic</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;800&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>tailwind.config={theme:{extend:{colors:{midnight:"#0E1020",canvas:"#F6F3F0",ink:"#3D3F50",royal:"#004AAC",risk:"#D14600"},
+  fontFamily:{display:["'Playfair Display'","serif"],body:["'DM Sans'","sans-serif"]}}}}</script>
+<style>body{font-family:'DM Sans',sans-serif;background:#F6F3F0;color:#0E1020} .display{font-family:'Playfair Display',serif}</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel" data-presets="react">
+const {useState,useEffect}=React;
+const TIER={Emerging:"#FFC982",Developing:"#FFAE41",Established:"#A1E6FF",Leading:"#4995FF"};
+const SEV={CRITICAL:"#D14600",HIGH:"#FF7E51",MEDIUM:"#FFAE41",LOW:"#A1E6FF"};
+const PRIO={expedited:"#D14600",standard:"#4995FF",deferred:"#8A867E"};
+const DXC_PATH="M220.055 60.7583C252.905 60.7583 279.643 87.4387 279.644 120.247C279.644 153.055 252.905 179.735 220.055 179.735H61V155.455H220.055C239.522 155.455 255.362 139.657 255.362 120.247C255.362 100.836 239.522 85.0396 220.055 85.0396H61V60.7583H220.055ZM798 85.0386H638.945C619.478 85.0386 603.638 100.836 603.638 120.247C603.638 139.657 619.478 155.454 638.945 155.454H798V179.735H638.945C606.08 179.735 579.357 153.054 579.356 120.247C579.356 87.4387 606.095 60.7573 638.945 60.7573H798V85.0386ZM556.104 85.0386C530.11 85.0387 511.856 96.5366 492.531 108.706C486.261 112.662 479.906 116.647 473.278 120.204C479.905 123.76 486.261 127.744 492.531 131.701C511.856 143.87 530.11 155.368 556.104 155.368V179.649C523.097 179.649 499.987 165.095 479.591 152.254C462.637 141.585 447.997 132.358 430.058 132.358C412.118 132.358 397.478 141.571 380.524 152.254C360.128 165.095 337.018 179.649 304.011 179.649V155.368C330.006 155.368 348.259 143.87 367.584 131.701C373.854 127.744 380.211 123.76 386.838 120.204C380.211 116.647 373.854 112.662 367.584 108.706C348.259 96.5366 330.006 85.0386 304.011 85.0386V60.7573C337.018 60.7573 360.128 75.3119 380.524 88.1665C397.478 98.8358 412.118 108.063 430.058 108.063V108.048C447.997 108.048 462.637 98.8364 479.591 88.1528C499.987 75.3125 523.097 60.7575 556.104 60.7573V85.0386Z";
+const DxcLogo=({h=20})=>(<svg viewBox="0 0 860 240" height={h} style={{width:(860/240)*h,display:"block"}} role="img" aria-label="DXC"><path d={DXC_PATH} fill="currentColor"/></svg>);
+
+function App(){
+  const [queue,setQueue]=useState([]);
+  const [sel,setSel]=useState(null);
+  const [detail,setDetail]=useState(null);
+  const [note,setNote]=useState("");
+  const [msg,setMsg]=useState("");
+
+  const loadQueue=()=>fetch("/api/review/queue").then(r=>r.json()).then(d=>setQueue(d.queue||[]));
+  useEffect(()=>{loadQueue();},[]);
+  const open=(id)=>{setSel(id);setNote("");setMsg("");fetch("/api/review/"+id).then(r=>r.json()).then(setDetail);};
+  const seed=async()=>{for(const f of ["meridianfs","northerncare","aureliantech"]){await fetch("/api/fixture/"+f);} loadQueue();};
+  const decide=(decision)=>fetch(`/api/review/${sel}/decision`,{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({decision,note})}).then(r=>r.json()).then(d=>{setMsg(decision==="approved"?"Approved for delivery.":"Sent back for reprocessing.");loadQueue();});
+
+  return (
+    <div className="min-h-screen">
+      <div className="px-6 py-4 border-b border-black/10 flex justify-between items-center">
+        <div className="flex items-center gap-2.5 text-midnight"><DxcLogo h={20}/>
+          <span className="w-px h-4 bg-midnight/20"></span>
+          <span className="text-sm font-semibold text-midnight">AdvisoryX · Partner Review</span></div>
+        <button onClick={seed} className="text-xs bg-black/5 hover:bg-black/10 px-3 py-1.5 rounded">Seed queue with demo scenarios</button>
+      </div>
+      <div className="grid md:grid-cols-[360px_1fr] min-h-[calc(100vh-57px)]">
+        {/* queue */}
+        <div className="border-r border-black/10 overflow-y-auto">
+          {queue.length===0 && <div className="p-6 text-ink text-sm">Queue empty. Click “Seed queue with demo scenarios”.</div>}
+          {queue.map(q=>(
+            <button key={q.id} onClick={()=>open(q.id)}
+              className={`w-full text-left p-4 border-b border-black/5 hover:bg-black/5 ${sel===q.id?"bg-black/5":""}`}>
+              <div className="flex justify-between items-start">
+                <div className="font-semibold">{q.company}</div>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded uppercase" style={{background:PRIO[q.priority],color:"#0E1020"}}>{q.priority}</span>
+              </div>
+              <div className="text-xs text-ink mt-1 flex gap-3">
+                <span style={{color:TIER[q.overall_tier]}}>{q.overall_score} {q.overall_tier}</span>
+                <span>{q.flag_count} flag{q.flag_count!==1?"s":""}</span>
+                <span className="text-[#8A867E]">{q.validation_status}</span>
+              </div>
+              <div className="text-[11px] text-[#8A867E] mt-1">{q.status}</div>
+            </button>
+          ))}
+        </div>
+        {/* detail */}
+        <div className="overflow-y-auto p-6">
+          {!detail && <div className="text-ink">Select a scorecard from the queue to review.</div>}
+          {detail && <Detail key={detail.id} d={detail} note={note} setNote={setNote} decide={decide} msg={msg}/>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Detail({d,note,setNote,decide,msg}){
+  const sc=d.scorecard, val=sc.validation||{flags:[]};
+  return (
+    <div>
+      <div className="flex justify-between items-start flex-wrap gap-3">
+        <div>
+          <h1 className="display text-3xl font-extrabold">{sc.company_name}</h1>
+          <div className="text-ink text-sm">{sc.industry_label} · {sc.assessment_date} · persona {sc.persona}</div>
+        </div>
+        <div className="text-right">
+          <span className="text-xs font-bold px-3 py-1 rounded-full text-midnight" style={{background:TIER[sc.overall_tier]}}>{sc.overall_tier}</span>
+          <div className="display text-4xl font-extrabold">{sc.overall_score}</div>
+          <div className="mt-1 flex flex-col items-end gap-0.5 text-xs">
+            <a href={`/api/scorecard/${d.id}/pdf`} target="_blank" className="text-royal hover:underline">Scorecard PDF ↗</a>
+            <a href={`/api/scorecard/${d.id}/quickwins.pdf`} target="_blank" className="text-royal hover:underline">Quick-wins memo PDF ↗</a>
+            <a href={`/api/scorecard/${d.id}/appendix.pdf`} target="_blank" className="text-royal hover:underline">Findings appendix PDF ↗</a>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid lg:grid-cols-2 gap-6 mt-6">
+        <div>
+          {/* dimensions */}
+          <div className="bg-white border border-black/10 rounded-xl p-4 mb-4">
+            <div className="text-xs uppercase tracking-widest text-ink mb-3">Dimensions</div>
+            {sc.dimensions.map(dim=>(
+              <div key={dim.dimension} className="mb-2">
+                <div className="flex justify-between text-sm"><span>{dim.label}{dim.informational?" ·info":""}</span>
+                  <span style={{color:TIER[dim.tier]}}>{dim.score} {dim.tier}</span></div>
+                <div className="h-1.5 bg-black/5 rounded mt-1"><div className="h-full rounded" style={{width:dim.score+"%",background:dim.color}}/></div>
+              </div>
+            ))}
+          </div>
+          {/* findings */}
+          <div className="bg-white border border-black/10 rounded-xl p-4">
+            <div className="text-xs uppercase tracking-widest text-ink mb-3">Findings (prospect-facing)</div>
+            <ol className="space-y-2 text-sm">{sc.findings.map((f,i)=><li key={i}><b>{f.headline}.</b> <span className="text-ink">{f.body}</span></li>)}</ol>
+            <div className="text-xs uppercase tracking-widest text-ink mt-4 mb-2">Recommended next step</div>
+            <p className="text-sm text-ink">{sc.recommended_next_step.body}</p>
+          </div>
+        </div>
+
+        <div>
+          {/* validation flags */}
+          <div className="bg-white border border-black/10 rounded-xl p-4 mb-4">
+            <div className="text-xs uppercase tracking-widest text-ink mb-3">Validation (D2) · {val.overall_status}</div>
+            {(!val.flags||val.flags.length===0)&&<div className="text-sm text-ink">No blocking flags.</div>}
+            {(val.flags||[]).map((f,i)=>(
+              <div key={i} className="mb-2 text-sm border-l-2 pl-3" style={{borderColor:SEV[f.severity]}}>
+                <span className="font-bold" style={{color:SEV[f.severity]}}>{f.severity}</span> <span className="text-ink">{f.category}</span>
+                <div className="text-ink">{f.concern}{f.location?` (${f.location})`:""}</div>
+              </div>
+            ))}
+          </div>
+          {/* reasoning */}
+          <div className="bg-white border border-black/10 rounded-xl p-4 mb-4">
+            <div className="text-xs uppercase tracking-widest text-ink mb-3">AI reasoning trace (per dimension)</div>
+            {d.reasoning.dimension_reasoning.map((r,i)=>(
+              <div key={i} className="text-xs text-ink mb-1.5"><b className="text-midnight">{r.label}</b> <span className="text-[#8A867E]">conf {Math.round(r.confidence*100)}%</span><br/>{r.reasoning}</div>
+            ))}
+          </div>
+          {/* actions */}
+          <div className="bg-white border border-black/10 rounded-xl p-4">
+            <div className="text-xs uppercase tracking-widest text-ink mb-2">Partner decision</div>
+            <textarea value={note} onChange={e=>setNote(e.target.value)} rows={3} placeholder="Partner notes (captured for training)…"
+              className="w-full bg-canvas border border-black/15 rounded p-2 text-sm mb-3"/>
+            <div className="flex gap-2">
+              <button onClick={()=>decide("approved")} className="bg-royal hover:bg-[#003a86] text-white px-4 py-2 rounded font-semibold text-sm">Approve for delivery</button>
+              <button onClick={()=>decide("sent_back")} className="bg-black/5 hover:bg-black/10 px-4 py-2 rounded font-semibold text-sm">Send back</button>
+            </div>
+            {msg && <div className="text-sm mt-3 text-royal">{msg}</div>}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>

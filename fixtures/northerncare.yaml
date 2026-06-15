@@ -1,0 +1,35 @@
+# NorthernCare Health — healthcare scenario (Companion 03).
+# Early-stage AI: Q3.1=A triggers skip of Q3.2/Q3.3. Targets: Data 35, Gov 45, AI ~33, Org 48, Value 42, Reg 85.
+submission:
+  prospect_name: "Dr. Priya Anand"
+  prospect_role: "Chief Operating Officer"
+  prospect_email: "priya.anand@northerncare.org"
+  company_name_raw: "NorthernCare Health System"
+  industry_label: "Healthcare and life sciences"
+  industry_tag: "HLS"
+  size_band: "large"
+  hq_country: "US"
+  submission_source: "test"
+consent:
+  c1_use_for_scorecard: true
+  c2_anonymized_benchmark: true
+persona_hint: "P1"
+responses:
+  Q1.1: { option_id: A }
+  Q1.2: { scale_value: 2 }
+  Q1.3: { option_id: B }
+  Q1.4: { option_id: B }
+  Q2.1: { option_id: B }
+  Q2.2: { option_id: B }
+  Q2.3: { option_id: C }
+  Q3.1: { option_id: A }   # none/one pilot -> skips Q3.2, Q3.3
+  Q3.4: { option_id: B }
+  Q4.1: { option_id: B }
+  Q4.2: { option_id: B }
+  Q4.3: { option_id: A }
+  Q5.1: { option_id: B }
+  Q5.2: { option_id: A }
+  Q5.3: { option_id: A }
+  Q6.1: { option_ids: [hipaa_fda, us_sectoral, eu_ai_act, industry_specific] }
+  Q6.2: { option_id: C }
+  Q6.3: { text: "PHI kept in-region; clinical AI deployment gated on HIPAA and FDA SaMD review." }
