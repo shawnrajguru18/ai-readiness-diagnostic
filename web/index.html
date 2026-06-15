@@ -37,6 +37,12 @@ const API = ""; // same-origin when served by FastAPI; empty -> offline demo fal
    configured for THIS questionnaire so it calls the client tools record_answer +
    finish_interview (contract below) to auto-score. Agent must be Public and allow this origin. */
 const ELEVENLABS_AGENT_ID = "agent_2801ksn2g1w4f8q950snp6pc62mf";
+// Quick client-side persona inference (mirrors the server A2 fallback) for voice framing.
+const personaFromRole=(role="")=>{ const r=role.toLowerCase();
+  if(/cfo|finance|accounting|treasurer|controller/.test(r)) return "P3";
+  if(/cio|cto|cdo|chief data|chief ai|digital|data|architect|engineering|technolog/.test(r)) return "P2";
+  return "P1"; };
+const FRAMING_FOR={P1:"strategic-narrative",P2:"technical-operational",P3:"financial-quantitative"};
 const TIER_COLOR = { Emerging:"#FFC982", Developing:"#FFAE41", Established:"#A1E6FF", Leading:"#4995FF" };
 
 /* Official DXC brand mark (from DXC Logo/Brand Mark). Recolors via currentColor. */
@@ -396,9 +402,11 @@ function QuickWins({sc, onBack}) {
      finish_interview()                          // ends -> scores -> shows the scorecard
    These are registered on the widget below. Without that agent config, the prospect can
    still talk to the interviewer, then click "See my scorecard". */
-function VoiceInterview({company, industry, priorAnswers, onFinish, onChat, onBack}) {
+function VoiceInterview({company, industry, name, role, priorAnswers, onFinish, onChat, onBack}) {
   const collected = React.useRef({...(priorAnswers||{})});
   const [count, setCount] = useState(Object.keys(priorAnswers||{}).length);
+  const persona = personaFromRole(role||"");
+  const framing = FRAMING_FOR[persona];
   const configured = ELEVENLABS_AGENT_ID && !/REPLACE_WITH/.test(ELEVENLABS_AGENT_ID);
   useEffect(()=>{
     if(!configured) return;
@@ -414,7 +422,11 @@ function VoiceInterview({company, industry, priorAnswers, onFinish, onChat, onBa
           if(question_id){ collected.current[question_id]={option_id,scale_value,option_ids}; setCount(Object.keys(collected.current).length);} return "recorded"; },
         finish_interview:()=>{ onFinish(collected.current); return "completed"; },
       };
-      e.detail.config.dynamicVariables = { company_name: company||"", industry: industry||"", already_answered: Object.keys(collected.current).join(", ")||"none" };
+      e.detail.config.dynamicVariables = {
+        prospect_name: name||"there", prospect_role: role||"", company_name: company||"your organization",
+        industry: industry||"", persona, framing_preference: framing,
+        already_answered: Object.keys(collected.current).join(", ")||"none",
+      };
     }catch(err){} };
     el.addEventListener("elevenlabs-convai:call", onCall);
     return ()=>el.removeEventListener("elevenlabs-convai:call", onCall);
@@ -474,7 +486,7 @@ function App() {
 
   if(screen==="landing") return <Landing onBegin={begin} onVoice={voice} onSample={()=>{setSc(DEMO);setScreen("scorecard");}}/>;
   if(screen==="assessment") return <Assessment pool={pool} initialAnswers={answers} onSubmit={submit} onBack={()=>setScreen("landing")} onVoice={(a)=>{setAnswers(a||{});setScreen("voice");}}/>;
-  if(screen==="voice") return <VoiceInterview company={ctx.f&&ctx.f.company_name_raw} industry={ctx.f&&ctx.f.industry_label} priorAnswers={answers} onFinish={voiceFinish} onChat={(a)=>{setAnswers(a||{});setScreen(pool?"assessment":"landing");}} onBack={()=>setScreen("landing")}/>;
+  if(screen==="voice") return <VoiceInterview company={ctx.f&&ctx.f.company_name_raw} industry={ctx.f&&ctx.f.industry_label} name={ctx.f&&ctx.f.prospect_name} role={ctx.f&&ctx.f.prospect_role} priorAnswers={answers} onFinish={voiceFinish} onChat={(a)=>{setAnswers(a||{});setScreen(pool?"assessment":"landing");}} onBack={()=>setScreen("landing")}/>;
   if(screen==="submitted") return <Submitted company={(ctx.f&&ctx.f.company_name_raw)||sc.company_name} email={ctx.f&&ctx.f.prospect_email} onView={()=>setScreen("scorecard")}/>;
   if(screen==="scorecard") return <Scorecard sc={sc} onQuickWins={()=>setScreen("quickwins")}/>;
   if(screen==="quickwins") return <QuickWins sc={sc} onBack={()=>setScreen("scorecard")}/>;
