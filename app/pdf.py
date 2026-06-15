@@ -193,7 +193,7 @@ def build_scorecard_pdf(sc: Scorecard) -> bytes:
                       fontSize=9, textColor=ROYAL))],
                      [Paragraph(r.body, S["body"])],
                      [Paragraph(f"Duration: {r.duration_estimate_weeks}. Continue the conversation: "
-                                f"{r.contact_name}, {r.contact_title} | {r.contact_email}", S["small"])]],
+                                f"{r.contact_name} | {r.contact_email}", S["small"])]],
                     colWidths=[6.6 * inch])
     rec_tbl.setStyle(TableStyle([("LINEBEFORE", (0, 0), (0, -1), 3, ROYAL), ("LEFTPADDING", (0, 0), (-1, -1), 10),
                                  ("TOPPADDING", (0, 0), (-1, -1), 3), ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#F7FAFF"))]))
@@ -315,7 +315,7 @@ def build_quickwins_memo_pdf(sc: Scorecard) -> bytes:
                                   ("TOPPADDING", (0, 0), (-1, -1), 2), ("BOTTOMPADDING", (0, 0), (-1, -1), 2)]))
         story.append(KeepTogether(card)); story.append(Spacer(1, 12))
     r = sc.recommended_next_step
-    story.append(Paragraph(f"Continue the conversation: {r.contact_name}, {r.contact_title} | {r.contact_email}", S["small"]))
+    story.append(Paragraph(f"Continue the conversation: {r.contact_name} | {r.contact_email}", S["small"]))
     doc.build(story)
     return buf.getvalue()
 

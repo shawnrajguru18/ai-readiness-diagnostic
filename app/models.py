@@ -110,9 +110,9 @@ class RecommendedNextStep(BaseModel):
     engagement_type: str = "APR Discovery (scoped)"
     body: str = ""
     duration_estimate_weeks: str = "6-10 weeks"
-    contact_name: str = "Chris Bryson"
-    contact_title: str = "Senior Partner"
-    contact_email: str = "christopher.bryson@dxc.com"
+    contact_name: str = "DXC AdvisoryX"
+    contact_title: str = ""
+    contact_email: str = "advisoryx@dxc.com"
 
 
 class SelectedQuickWin(BaseModel):
@@ -139,7 +139,7 @@ class Scorecard(BaseModel):
     company_name: str = ""
     industry_label: str = ""
     assessment_date: str = ""
-    reviewed_by: str = "Chris Bryson, Senior Partner, DXC AdvisoryX"
+    reviewed_by: str = "DXC AdvisoryX"
     overall_score: int = 0
     overall_tier: Tier = "Emerging"
     peer_reference: str = ""

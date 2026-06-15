@@ -63,7 +63,7 @@ const Wordmark=({onDark=false})=>(
 /* ---------------- Embedded MeridianFS demo (offline fallback / instant sample) ---------------- */
 const DEMO = {
   company_name:"MeridianFS Holdings, Inc.", industry_label:"Financial services",
-  assessment_date:"14 June 2026", reviewed_by:"Chris Bryson, Senior Partner, DXC AdvisoryX",
+  assessment_date:"14 June 2026", reviewed_by:"DXC AdvisoryX",
   overall_score:55, overall_tier:"Developing", overall_color:"#FFAE41",
   peer_reference:"Peer average for large US financial services: 58 (n=42)",
   dimensions:[
@@ -79,7 +79,7 @@ const DEMO = {
     {finding_id:"F2",headline:"Governance is the largest dimensional gap",body:"AI risk ownership is distributed across CISO, Compliance, and Legal without an integrating accountability layer. FCA AI guidance interpretation is underway but not operationalized."},
     {finding_id:"F3",headline:"Operational processes are the strongest near-term path",body:"AP, IT incident management, and customer support already show measurable AI value in production. Scaling these patterns horizontally is a high-confidence path."},
   ],
-  recommended_next_step:{body:"APR Discovery engagement focused on claims adjudication reinvention and operational AI scaling. The Discovery would size value pockets across claims sub-processes, design governance integration, and produce a board-ready 18-month roadmap.",duration_estimate_weeks:"6-10 weeks",contact_name:"Chris Bryson",contact_title:"Senior Partner",contact_email:"christopher.bryson@dxc.com"},
+  recommended_next_step:{body:"APR Discovery engagement focused on claims adjudication reinvention and operational AI scaling. The Discovery would size value pockets across claims sub-processes, design governance integration, and produce a board-ready 18-month roadmap.",duration_estimate_weeks:"6-10 weeks",contact_name:"DXC AdvisoryX",contact_title:"",contact_email:"advisoryx@dxc.com"},
   quick_wins:[
     {pattern_name:"Intelligent Invoice Triage",one_line_description:"AI categorizes and routes invoice exceptions, reducing manual AP workload.",what_this_would_do:"Auto-resolve routine AP exceptions and route complex cases with context, freeing the AP team for vendor management.",prerequisites_you_have:["AP system with structured exception logging","6+ months of exception history"],expected_outcome_range:"AP exception handling time -40-60%",timeline_to_value:"8-10 weeks",implementation_effort:"Low"},
     {pattern_name:"IT Incident Auto-Categorization",one_line_description:"AI categorizes IT incidents, assigns severity, routes to the right tier.",what_this_would_do:"Cut mean-time-to-assignment and lift tier-1 deflection across your ServiceNow estate.",prerequisites_you_have:["ITSM system","Service catalog documented"],expected_outcome_range:"Mean time to assignment -60-80%",timeline_to_value:"6-10 weeks",implementation_effort:"Low"},
@@ -339,7 +339,6 @@ function Scorecard({sc, onQuickWins, onHome}) {
               <h1 className="display text-5xl font-extrabold mt-2 leading-none">{sc.company_name}</h1>
               <div className="text-sm text-ink mt-3">{sc.industry_label} · {sc.assessment_date}</div>
               <div className="text-sm text-midnight mt-1 flex items-center gap-1.5"><span className="text-royal font-bold">✓</span> Reviewed by <b>DXC AdvisoryX</b></div>
-              <div className="text-xs text-ink">{sc.recommended_next_step.contact_name}, {sc.recommended_next_step.contact_title}</div>
             </div>
             <div className="text-right">
               <div className="mb-2">{tierBadge(sc.overall_tier)}</div>
@@ -388,7 +387,7 @@ function Scorecard({sc, onQuickWins, onHome}) {
             <p className="text-sm text-ink mt-3">Duration: {sc.recommended_next_step.duration_estimate_weeks}.</p>
             <a href={`mailto:${sc.recommended_next_step.contact_email}?subject=${encodeURIComponent('AI Readiness Diagnostic — '+sc.company_name)}`}
                className="inline-block mt-4 px-5 py-2.5 rounded-lg bg-royal text-white text-sm font-semibold hover:bg-[#003a86]">Continue the conversation →</a>
-            <div className="text-xs text-ink mt-2">{sc.recommended_next_step.contact_name}, {sc.recommended_next_step.contact_title} · {sc.recommended_next_step.contact_email}</div>
+            <div className="text-xs text-ink mt-2">{sc.recommended_next_step.contact_name} · {sc.recommended_next_step.contact_email}</div>
           </div>
           <div className="bg-white rounded-2xl border border-black/10 p-6">
             <h2 className="text-xs font-bold uppercase tracking-widest mb-3" style={{color:"#9a6a00"}}>90-day quick wins</h2>

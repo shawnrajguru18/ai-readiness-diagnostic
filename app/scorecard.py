@@ -151,7 +151,6 @@ def render_scorecard_html(sc: Scorecard) -> str:
       <h1>{sc.company_name}</h1>
       <div class="meta" style="margin-top:10px">{sc.industry_label} &middot; {sc.assessment_date}</div>
       <div class="reviewed"><span style="color:{ROYAL};font-weight:700">&#10003;</span> Reviewed by <b>DXC AdvisoryX</b></div>
-      <div class="meta">{r.contact_name}, {r.contact_title}</div>
     </div>
     <div style="text-align:right">
       <span class="tierbadge" style="background:{TIER_COLORS[sc.overall_tier]}">{sc.overall_tier}</span>
@@ -170,7 +169,7 @@ def render_scorecard_html(sc: Scorecard) -> str:
     <p style="color:{MIDNIGHT};font-size:14px">{r.body}</p>
     <p class="muted" style="margin-top:6px">Duration: {r.duration_estimate_weeks}.</p>
     <a class="cta" href="mailto:{r.contact_email}">Continue the conversation &#8594;</a>
-    <p class="muted" style="margin-top:8px">{r.contact_name}, {r.contact_title} &middot; {r.contact_email}</p>
+    <p class="muted" style="margin-top:8px">{r.contact_name} &middot; {r.contact_email}</p>
   </div>
   <div class="panel"><h2 class="qwhead">90-day quick wins</h2>{qwins}</div>
   <div class="foot">Confidential — prepared for {sc.company_name}. Prepared by DXC AdvisoryX.</div>
