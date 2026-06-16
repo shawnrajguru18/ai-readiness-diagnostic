@@ -1,0 +1,21 @@
+# Render Blueprint — deploys the full AI Readiness Diagnostic (FastAPI + React UI).
+# In Render: New + -> Blueprint -> pick this repo -> it reads this file and deploys.
+# Free tier note: the service sleeps after ~15 min idle; the first request after a
+# sleep cold-starts in ~30-60s. In-memory STORE resets on each cold start (fine for
+# testing/demo; move to a database for production).
+services:
+  - type: web
+    name: ai-readiness-diagnostic
+    runtime: python
+    plan: free
+    region: oregon
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.api:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.6"
+      # Optional: set in the Render dashboard to enable the live Claude pipeline.
+      # Without it, the app runs the deterministic offline pipeline (same as local).
+      - key: ANTHROPIC_API_KEY
+        sync: false
