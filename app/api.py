@@ -21,6 +21,7 @@ from pydantic import BaseModel
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from .content import load_question_pool, load_fixture
 from .models import TIER_COLORS, Session
@@ -33,6 +34,11 @@ WEB = ROOT / "web"
 
 app = FastAPI(title="DXC AI Readiness Diagnostic", version="0.2")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+
+# Serve vendored front-end libs (React/ReactDOM/Babel/Tailwind) locally — no external CDN.
+_VENDOR = ROOT / "web" / "vendor"
+if _VENDOR.is_dir():
+    app.mount("/vendor", StaticFiles(directory=str(_VENDOR)), name="vendor")
 
 # In-memory store (V0; PostgreSQL per Companion 05 in production).
 STORE: dict[str, dict[str, Any]] = {}
