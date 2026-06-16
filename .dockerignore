@@ -1,0 +1,18 @@
+# Keep the image small and never bake secrets or local junk into it.
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.git/
+.gitignore
+.gitattributes
+
+# Secrets — provided at runtime via App Runner / ECS env, never in the image
+.env
+.env.*
+
+# Local-only artifacts and heavy source material not needed at runtime
+outputs/
+tests/
+*.pptx
+*.docx
