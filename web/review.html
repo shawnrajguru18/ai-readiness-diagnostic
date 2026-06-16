@@ -9,6 +9,13 @@
 <script src="/vendor/react.production.min.js"></script>
 <script src="/vendor/react-dom.production.min.js"></script>
 <script src="/vendor/babel.min.js"></script>
+<script>
+  /* Pin the classic JSX runtime — newer @babel/preset-react defaults to the automatic
+     runtime, which injects a bare `import` that crashes the in-browser render. */
+  Babel.registerPreset("react-classic", {
+    presets: [[Babel.availablePresets["react"], { runtime: "classic" }]],
+  });
+</script>
 <script src="/vendor/tailwind.js"></script>
 <script>tailwind.config={theme:{extend:{colors:{midnight:"#0E1020",canvas:"#F6F3F0",ink:"#3D3F50",royal:"#004AAC",risk:"#D14600"},
   fontFamily:{display:["'Playfair Display'","serif"],body:["'DM Sans'","sans-serif"]}}}}</script>
@@ -16,7 +23,7 @@
 </head>
 <body>
 <div id="root"></div>
-<script type="text/babel" data-presets="react">
+<script type="text/babel" data-presets="react-classic">
 const {useState,useEffect}=React;
 const TIER={Emerging:"#FFC982",Developing:"#FFAE41",Established:"#A1E6FF",Leading:"#4995FF"};
 const SEV={CRITICAL:"#D14600",HIGH:"#FF7E51",MEDIUM:"#FFAE41",LOW:"#A1E6FF"};

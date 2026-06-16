@@ -10,6 +10,15 @@
 <script src="/vendor/react.production.min.js"></script>
 <script src="/vendor/react-dom.production.min.js"></script>
 <script src="/vendor/babel.min.js"></script>
+<script>
+  /* Force the classic JSX runtime (React.createElement). Newer @babel/preset-react
+     defaults to the automatic runtime, which injects `import {jsx} from "react/jsx-runtime"`
+     into the compiled output — an illegal bare import in a non-module script that crashes
+     the whole render. Register a preset that pins runtime:"classic" and use it below. */
+  Babel.registerPreset("react-classic", {
+    presets: [[Babel.availablePresets["react"], { runtime: "classic" }]],
+  });
+</script>
 <script src="/vendor/tailwind.js"></script>
 <script>
   tailwind.config = {
@@ -30,7 +39,7 @@
 </head>
 <body>
 <div id="root"></div>
-<script type="text/babel" data-presets="react">
+<script type="text/babel" data-presets="react-classic">
 const { useState, useEffect } = React;
 const API = ""; // same-origin when served by FastAPI; empty -> offline demo fallback
 
