@@ -18,5 +18,5 @@ COPY . .
 EXPOSE 8080
 
 # App Runner / ECS route traffic to $PORT (defaults to 8080 here).
-# Single worker keeps the in-memory STORE coherent (see notes: move to a DB for prod).
+# Credentials (Bedrock, DynamoDB) resolved from environment or IAM instance role (SigV4).
 CMD ["sh", "-c", "uvicorn app.api:app --host 0.0.0.0 --port ${PORT:-8080}"]

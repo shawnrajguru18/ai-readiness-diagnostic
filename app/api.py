@@ -26,6 +26,7 @@ from fastapi.staticfiles import StaticFiles
 from .content import load_question_pool, load_fixture
 from .models import TIER_COLORS, Session
 from .orchestrator import build_session, run_pipeline
+from .store import store
 from .pdf import (build_scorecard_pdf, build_quickwins_memo_pdf, build_appendix_pdf,
                   build_action_plan_pdf, build_board_brief_pdf)
 
@@ -40,10 +41,6 @@ _VENDOR = ROOT / "web" / "vendor"
 if _VENDOR.is_dir():
     app.mount("/vendor", StaticFiles(directory=str(_VENDOR)), name="vendor")
 
-# In-memory store (V0; PostgreSQL per Companion 05 in production).
-STORE: dict[str, dict[str, Any]] = {}
-
-
 def _serialize(session: Session) -> dict[str, Any]:
     sc = session.scorecard
     d = sc.model_dump()
@@ -57,14 +54,14 @@ def _serialize(session: Session) -> dict[str, Any]:
 
 def _store(session: Session) -> str:
     sid = uuid.uuid4().hex[:10]
-    STORE[sid] = {
+    store.put({
         "id": sid,
         "session": session,
         "scorecard": _serialize(session),
         "created_at": datetime.now(timezone.utc).isoformat(),
         "status": "partner_review_queued",
         "partner_note": "",
-    }
+    })
     return sid
 
 
@@ -112,7 +109,7 @@ def assess(req: AssessRequest):
 @app.get("/api/review/queue")
 def review_queue():
     rows = []
-    for rec in STORE.values():
+    for rec in store.all_records():
         sc = rec["scorecard"]; val = sc.get("validation") or {}
         flags = val.get("flags", [])
         rows.append({
@@ -134,7 +131,7 @@ def review_queue():
 
 @app.get("/api/review/{sid}")
 def review_detail(sid: str):
-    rec = STORE.get(sid)
+    rec = store.get(sid)
     if not rec:
         raise HTTPException(404, "Not found")
     sc = rec["scorecard"]
@@ -152,20 +149,21 @@ def review_detail(sid: str):
 
 @app.post("/api/review/{sid}/decision")
 def review_decision(sid: str, req: DecisionRequest):
-    rec = STORE.get(sid)
+    rec = store.get(sid)
     if not rec:
         raise HTTPException(404, "Not found")
     rec["status"] = "approved_for_delivery" if req.decision == "approved" else "sent_back_for_reprocessing"
     rec["partner_note"] = req.note
     if rec["session"]:
         rec["session"].partner_approved = req.decision == "approved"
+    store.save(rec)  # persist mutation (no-op re-put for the in-memory backend)
     return {"id": sid, "status": rec["status"]}
 
 
 # ---------------- PDF deliverable ----------------
 @app.get("/api/scorecard/{sid}/pdf")
 def scorecard_pdf(sid: str):
-    rec = STORE.get(sid)
+    rec = store.get(sid)
     if not rec:
         raise HTTPException(404, "Not found")
     pdf = build_scorecard_pdf(rec["session"].scorecard)
@@ -183,7 +181,7 @@ def _pdf_response(rec, builder, label):
 
 @app.get("/api/scorecard/{sid}/quickwins.pdf")
 def quickwins_pdf(sid: str):
-    rec = STORE.get(sid)
+    rec = store.get(sid)
     if not rec:
         raise HTTPException(404, "Not found")
     return _pdf_response(rec, build_quickwins_memo_pdf, "Quick-Wins-Memo")
@@ -191,7 +189,7 @@ def quickwins_pdf(sid: str):
 
 @app.get("/api/scorecard/{sid}/appendix.pdf")
 def appendix_pdf(sid: str):
-    rec = STORE.get(sid)
+    rec = store.get(sid)
     if not rec:
         raise HTTPException(404, "Not found")
     return _pdf_response(rec, build_appendix_pdf, "Findings-Appendix")
@@ -199,7 +197,7 @@ def appendix_pdf(sid: str):
 
 @app.get("/api/scorecard/{sid}/action-plan.pdf")
 def action_plan_pdf(sid: str):
-    rec = STORE.get(sid)
+    rec = store.get(sid)
     if not rec:
         raise HTTPException(404, "Not found")
     return _pdf_response(rec, build_action_plan_pdf, "90-Day-Action-Plan")
@@ -207,7 +205,7 @@ def action_plan_pdf(sid: str):
 
 @app.get("/api/scorecard/{sid}/board-brief.pdf")
 def board_brief_pdf(sid: str):
-    rec = STORE.get(sid)
+    rec = store.get(sid)
     if not rec:
         raise HTTPException(404, "Not found")
     return _pdf_response(rec, build_board_brief_pdf, "Board-Brief")

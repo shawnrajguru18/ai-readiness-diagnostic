@@ -1,26 +1,27 @@
-"""Thin wrapper around the Anthropic SDK.
+"""Thin wrapper around the Anthropic SDK (AWS Bedrock backend).
 
 Two entry points:
   - complete_text(...)        free-text generation (questioner, narrative)
   - parse_structured(...)     schema-constrained output via messages.parse() (capture, scoring, probe)
 
 Defaults to adaptive thinking (recommended for Claude 4.6+) and effort=high.
+Uses AWS Bedrock for Claude access (SigV4 auth via IAM, no API key needed).
 """
 from __future__ import annotations
 from typing import Any, Sequence, Type, TypeVar
 from pydantic import BaseModel
 
-import anthropic
+from anthropic import AnthropicBedrock
 
 from .config import settings
 
 T = TypeVar("T", bound=BaseModel)
 
-# Resolves ANTHROPIC_API_KEY from the environment.
-_client = anthropic.Anthropic()
+# Resolves AWS credentials from environment/IAM roles (SigV4).
+_client = AnthropicBedrock(region_name=settings.aws_region)
 
 
-def client() -> anthropic.Anthropic:
+def client() -> AnthropicBedrock:
     return _client
 
 

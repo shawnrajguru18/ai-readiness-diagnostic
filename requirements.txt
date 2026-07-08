@@ -1,4 +1,4 @@
-anthropic>=0.92.0
+anthropic>=0.92.0  # AnthropicBedrock for AWS Bedrock access (SigV4 auth, no API key)
 pydantic>=2.6
 PyYAML>=6.0
 python-dotenv>=1.0
@@ -7,3 +7,4 @@ fastapi>=0.110
 uvicorn>=0.29
 reportlab>=4.0
 svglib>=1.5
+boto3>=1.34          # DynamoDB session store (only used when AIDIAG_DDB_TABLE is set)
