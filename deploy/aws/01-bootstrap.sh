@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# One-time AWS setup for the App Runner deployment. Idempotent — safe to re-run.
-# Creates: ECR repo, DynamoDB table, and the two IAM roles App Runner needs
-# (ECR-pull access role + app instance role with Bedrock + DynamoDB access).
+# One-time AWS setup for ECS Express Mode deployment. Idempotent — safe to re-run.
+# Creates: ECR repo, DynamoDB table, ECS cluster, and IAM task role
+# (task role has Bedrock + DynamoDB access; ECS task execution role created by AWS).
 #
 # Prereqs: aws CLI v2, authenticated (e.g. `aws sso login`) with rights to create
-# ECR / DynamoDB / IAM resources and enable Bedrock model access in the target account.
+# ECR / DynamoDB / ECS / IAM resources and enable Bedrock model access in the target account.
 set -euo pipefail
 cd "$(dirname "$0")"
 source ./config.sh
@@ -24,14 +24,18 @@ if ! aws dynamodb describe-table --table-name "${DDB_TABLE}" --region "${AWS_REG
   aws dynamodb wait table-exists --table-name "${DDB_TABLE}" --region "${AWS_REGION}"
 fi
 
-echo "==> IAM instance role: ${INSTANCE_ROLE_NAME} (DynamoDB + Bedrock access)"
-aws iam get-role --role-name "${INSTANCE_ROLE_NAME}" >/dev/null 2>&1 || \
-  aws iam create-role --role-name "${INSTANCE_ROLE_NAME}" \
+echo "==> ECS cluster: ${CLUSTER_NAME} (Express Mode)"
+aws ecs create-cluster --cluster-name "${CLUSTER_NAME}" --region "${AWS_REGION}" \
+  --cluster-settings name=containerInsights,value=disabled >/dev/null 2>&1 || true
+
+echo "==> IAM task role: ${TASK_ROLE_NAME} (DynamoDB + Bedrock access)"
+aws iam get-role --role-name "${TASK_ROLE_NAME}" >/dev/null 2>&1 || \
+  aws iam create-role --role-name "${TASK_ROLE_NAME}" \
     --assume-role-policy-document '{
       "Version":"2012-10-17",
-      "Statement":[{"Effect":"Allow","Principal":{"Service":"tasks.apprunner.amazonaws.com"},"Action":"sts:AssumeRole"}]
+      "Statement":[{"Effect":"Allow","Principal":{"Service":"ecs-tasks.amazonaws.com"},"Action":"sts:AssumeRole"}]
     }' >/dev/null
-aws iam put-role-policy --role-name "${INSTANCE_ROLE_NAME}" --policy-name app-permissions \
+aws iam put-role-policy --role-name "${TASK_ROLE_NAME}" --policy-name app-permissions \
   --policy-document "{
     \"Version\":\"2012-10-17\",
     \"Statement\":[
@@ -44,18 +48,10 @@ aws iam put-role-policy --role-name "${INSTANCE_ROLE_NAME}" --policy-name app-pe
     ]
   }" >/dev/null
 
-echo "==> IAM access role: ${ACCESS_ROLE_NAME} (lets App Runner pull from private ECR)"
-aws iam get-role --role-name "${ACCESS_ROLE_NAME}" >/dev/null 2>&1 || \
-  aws iam create-role --role-name "${ACCESS_ROLE_NAME}" \
-    --assume-role-policy-document '{
-      "Version":"2012-10-17",
-      "Statement":[{"Effect":"Allow","Principal":{"Service":"build.apprunner.amazonaws.com"},"Action":"sts:AssumeRole"}]
-    }' >/dev/null
-aws iam attach-role-policy --role-name "${ACCESS_ROLE_NAME}" \
-  --policy-arn arn:aws:iam::aws:policy/service-role/AWSAppRunnerServicePolicyForECRAccess >/dev/null 2>&1 || true
-
 echo
 echo "Bootstrap complete."
-echo "  instance role ARN: ${INSTANCE_ROLE_ARN}"
-echo "  access role ARN:   ${ACCESS_ROLE_ARN}"
+echo "  ECR URI:          ${ECR_URI}"
+echo "  DynamoDB table:   ${DDB_TABLE}"
+echo "  ECS cluster:      ${CLUSTER_NAME}"
+echo "  task role ARN:    ${TASK_ROLE_ARN}"
 echo "Next: run ./02-deploy.sh"

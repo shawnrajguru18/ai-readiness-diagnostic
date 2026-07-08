@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build the container, push to ECR, and create-or-update the App Runner service.
+# Build the container, push to ECR, and create-or-update the ECS Express Mode service.
 # Repeatable — run this for every deploy. Requires ./01-bootstrap.sh to have run once.
 #
 # Prereqs: aws CLI v2 (authenticated) + Docker running locally.
@@ -7,6 +7,18 @@ set -euo pipefail
 cd "$(dirname "$0")"
 source ./config.sh
 REPO_ROOT="$(cd ../.. && pwd)"
+
+get_default_subnet() {
+  aws ec2 describe-subnets --region "${AWS_REGION}" \
+    --filters "Name=default-for-az,Values=true" \
+    --query 'Subnets[0].SubnetId' --output text
+}
+
+get_default_sg() {
+  aws ec2 describe-security-groups --region "${AWS_REGION}" \
+    --filters "Name=group-name,Values=default" \
+    --query 'SecurityGroups[0].GroupId' --output text
+}
 
 echo "==> Docker login to ECR"
 aws ecr get-login-password --region "${AWS_REGION}" | \
@@ -18,60 +30,131 @@ docker build -t "${IMAGE_URI}" "${REPO_ROOT}"
 echo "==> Push image"
 docker push "${IMAGE_URI}"
 
-# Source config shared by create and update (App Runner reads the app's env here).
-# Credentials resolved from IAM instance role (SigV4 auth for Bedrock + DynamoDB).
-SRC_CONFIG=$(cat <<JSON
+echo "==> Register task definition"
+TASK_DEF_JSON=$(cat <<EOF
 {
-  "AuthenticationConfiguration": {"AccessRoleArn": "${ACCESS_ROLE_ARN}"},
-  "AutoDeploymentsEnabled": true,
-  "ImageRepository": {
-    "ImageIdentifier": "${IMAGE_URI}",
-    "ImageRepositoryType": "ECR",
-    "ImageConfiguration": {
-      "Port": "8080",
-      "RuntimeEnvironmentVariables": {"AIDIAG_DDB_TABLE": "${DDB_TABLE}", "AWS_REGION": "${AWS_REGION}"}
+  "family": "${APP_NAME}",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "${TASK_CPU}",
+  "memory": "${TASK_MEMORY}",
+  "containerDefinitions": [
+    {
+      "name": "${APP_NAME}",
+      "image": "${IMAGE_URI}",
+      "portMappings": [{"containerPort": 8080, "hostPort": 8080, "protocol": "tcp"}],
+      "environment": [
+        {"name": "AIDIAG_DDB_TABLE", "value": "${DDB_TABLE}"},
+        {"name": "AWS_REGION", "value": "${AWS_REGION}"}
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/${APP_NAME}",
+          "awslogs-region": "${AWS_REGION}",
+          "awslogs-stream-prefix": "ecs"
+        }
+      },
+      "healthCheck": {
+        "command": ["CMD-SHELL", "curl -f http://localhost:8080/ || exit 1"],
+        "interval": 30,
+        "timeout": 5,
+        "retries": 3,
+        "startPeriod": 60
+      }
     }
-  }
+  ],
+  "taskRoleArn": "${TASK_ROLE_ARN}",
+  "executionRoleArn": "arn:aws:iam::${ACCOUNT_ID}:role/ecsTaskExecutionRole"
 }
-JSON
+EOF
 )
-INSTANCE_CONFIG=$(cat <<JSON
-{"Cpu": "${APP_CPU}", "Memory": "${APP_MEMORY}", "InstanceRoleArn": "${INSTANCE_ROLE_ARN}"}
-JSON
-)
-HEALTH_CONFIG='{"Protocol":"HTTP","Path":"/","Interval":10,"Timeout":5,"HealthyThreshold":1,"UnhealthyThreshold":5}'
 
-SERVICE_ARN="$(aws apprunner list-services --region "${AWS_REGION}" \
-  --query "ServiceSummaryList[?ServiceName=='${APP_NAME}'].ServiceArn | [0]" --output text)"
+TASK_DEF_ARN="$(aws ecs register-task-definition \
+  --region "${AWS_REGION}" \
+  --cli-input-json "${TASK_DEF_JSON}" \
+  --query 'taskDefinition.taskDefinitionArn' \
+  --output text)"
+echo "    ${TASK_DEF_ARN}"
 
-if [ "${SERVICE_ARN}" = "None" ] || [ -z "${SERVICE_ARN}" ]; then
-  echo "==> Creating App Runner service: ${APP_NAME}"
-  SERVICE_ARN="$(aws apprunner create-service --region "${AWS_REGION}" \
+echo "==> Create CloudWatch log group"
+aws logs create-log-group --log-group-name "/ecs/${APP_NAME}" --region "${AWS_REGION}" 2>/dev/null || true
+
+echo "==> Create or update ECS service (Express Mode)"
+SERVICE_EXISTS=$(aws ecs describe-services --region "${AWS_REGION}" \
+  --cluster "${CLUSTER_NAME}" --services "${APP_NAME}" \
+  --query 'services[0].serviceName' --output text 2>/dev/null || echo "")
+
+if [ -z "${SERVICE_EXISTS}" ] || [ "${SERVICE_EXISTS}" = "None" ]; then
+  echo "    Creating new service..."
+  aws ecs create-service --region "${AWS_REGION}" \
+    --cluster "${CLUSTER_NAME}" \
     --service-name "${APP_NAME}" \
-    --source-configuration "${SRC_CONFIG}" \
-    --instance-configuration "${INSTANCE_CONFIG}" \
-    --health-check-configuration "${HEALTH_CONFIG}" \
-    --query 'Service.ServiceArn' --output text)"
+    --task-definition "${TASK_DEF_ARN}" \
+    --desired-count "${TASK_COUNT}" \
+    --launch-type FARGATE \
+    --network-configuration "awsvpcConfiguration={assignPublicIp=ENABLED,subnets=[$(get_default_subnet)],securityGroups=[$(get_default_sg)]}" \
+    --enable-execute-command >/dev/null
 else
-  echo "==> Updating App Runner service: ${APP_NAME}"
-  aws apprunner update-service --region "${AWS_REGION}" \
-    --service-arn "${SERVICE_ARN}" \
-    --source-configuration "${SRC_CONFIG}" \
-    --instance-configuration "${INSTANCE_CONFIG}" \
-    --health-check-configuration "${HEALTH_CONFIG}" >/dev/null
+  echo "    Updating existing service..."
+  aws ecs update-service --region "${AWS_REGION}" \
+    --cluster "${CLUSTER_NAME}" \
+    --service "${APP_NAME}" \
+    --task-definition "${TASK_DEF_ARN}" \
+    --force-new-deployment >/dev/null
 fi
 
-echo "==> Waiting for service to reach RUNNING (this can take a few minutes)"
-while true; do
-  STATUS="$(aws apprunner describe-service --region "${AWS_REGION}" --service-arn "${SERVICE_ARN}" --query 'Service.Status' --output text)"
-  echo "    status=${STATUS}"
-  case "${STATUS}" in
-    RUNNING) break ;;
-    CREATE_FAILED|DELETE_FAILED|PAUSED) echo "Service in ${STATUS}; check the App Runner console."; exit 1 ;;
-  esac
-  sleep 15
-done
+echo "==> Waiting for service to stabilize (this can take a few minutes)"
+aws ecs wait services-stable --region "${AWS_REGION}" \
+  --cluster "${CLUSTER_NAME}" \
+  --services "${APP_NAME}"
 
-URL="$(aws apprunner describe-service --region "${AWS_REGION}" --service-arn "${SERVICE_ARN}" --query 'Service.ServiceUrl' --output text)"
-echo
-echo "Deployed. App URL: https://${URL}"
+echo "==> Get service details"
+SERVICE_DETAILS=$(aws ecs describe-services --region "${AWS_REGION}" \
+  --cluster "${CLUSTER_NAME}" --services "${APP_NAME}" \
+  --query 'services[0]')
+
+RUNNING_COUNT=$(echo "${SERVICE_DETAILS}" | jq '.runningCount')
+DESIRED_COUNT=$(echo "${SERVICE_DETAILS}" | jq '.desiredCount')
+
+echo "    running tasks: ${RUNNING_COUNT}/${DESIRED_COUNT}"
+
+if [ "${RUNNING_COUNT}" -gt 0 ]; then
+  TASK_ARN=$(echo "${SERVICE_DETAILS}" | jq -r '.taskDefinition' | rev | cut -d'/' -f1 | rev)
+  TASK_ID=$(aws ecs list-tasks --region "${AWS_REGION}" \
+    --cluster "${CLUSTER_NAME}" \
+    --service-name "${APP_NAME}" \
+    --query 'taskArns[0]' --output text | rev | cut -d'/' -f1 | rev)
+
+  TASK_INFO=$(aws ecs describe-tasks --region "${AWS_REGION}" \
+    --cluster "${CLUSTER_NAME}" \
+    --tasks "${TASK_ID}" \
+    --query 'tasks[0].attachments[0].details' --output json)
+
+  IP=$(echo "${TASK_INFO}" | jq -r '.[] | select(.name=="networkInterfaceId") | .value' 2>/dev/null || echo "")
+  if [ -z "${IP}" ]; then
+    ENI=$(echo "${TASK_INFO}" | jq -r '.[] | select(.name=="networkInterfaceId") | .value' 2>/dev/null)
+    if [ -n "${ENI}" ]; then
+      IP=$(aws ec2 describe-network-interfaces --region "${AWS_REGION}" \
+        --network-interface-ids "${ENI}" --query 'NetworkInterfaces[0].Association.PublicIp' --output text 2>/dev/null || echo "")
+    fi
+  fi
+
+  if [ -n "${IP}" ] && [ "${IP}" != "None" ] && [ "${IP}" != "" ]; then
+    echo
+    echo "Deployed successfully!"
+    echo "  App URL: http://${IP}:8080"
+    echo "  (Note: task may still be initializing; check logs if not responding)"
+    echo
+    echo "To view logs:"
+    echo "  aws logs tail /ecs/${APP_NAME} --follow --region ${AWS_REGION}"
+  else
+    echo
+    echo "Deployed to ECS cluster ${CLUSTER_NAME}, service ${APP_NAME}"
+    echo "Task is starting (may take 1-2 minutes)."
+    echo "Check the ECS console for the service IP once the task is running."
+  fi
+else
+  echo "WARNING: No tasks are running. Check the ECS console for errors."
+  exit 1
+fi
