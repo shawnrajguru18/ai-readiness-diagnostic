@@ -29,19 +29,8 @@ cd deploy/aws
 bash 01-bootstrap.sh
 ```
 This creates the ECR repo, the DynamoDB table (`ai-readiness-sessions`, on-demand, PK `id`),
-the ECS cluster, and the IAM task role (with Bedrock + DynamoDB permissions). It's **idempotent**.
-
-Credentials are resolved from the ECS task role via SigV4 authentication — no secrets needed.
-The default ecsTaskExecutionRole is assumed to exist; if not, create it:
-```bash
-aws iam create-role --role-name ecsTaskExecutionRole \
-  --assume-role-policy-document '{
-    "Version":"2012-10-17",
-    "Statement":[{"Effect":"Allow","Principal":{"Service":"ecs-tasks.amazonaws.com"},"Action":"sts:AssumeRole"}]
-  }'
-aws iam attach-role-policy --role-name ecsTaskExecutionRole \
-  --policy-arn arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
-```
+the ECS cluster, the IAM task role (with Bedrock + DynamoDB permissions), and the execution role
+(for ECR pull + CloudWatch logs). It's **idempotent** — safe to re-run.
 
 ## Deploy (repeat for every release)
 ```bash
@@ -75,8 +64,6 @@ and deterministic offline pipeline — no AWS needed.
   If access is denied or not enabled, the app falls back to the deterministic offline pipeline.
 - **Default VPC:** The deploy script uses your account's default VPC and security group. If you don't have
   a default VPC, create one in the VPC console or use custom subnets by editing the script.
-- **IAM roles:** `ecsTaskExecutionRole` must exist; create it if `01-bootstrap.sh` fails. The task role
-  is created by bootstrap and is service-linked (auto-cleanup).
 - **DXC account guardrails:** SCPs / permission boundaries may block ECR, ECS, DynamoDB, or Bedrock in
   certain regions. Confirm your region is approved before running `01-bootstrap.sh`.
 - **First deploy is slow:** Task pulling the image + starting can take 2-3 minutes. Subsequent deploys
