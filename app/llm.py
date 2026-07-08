@@ -18,7 +18,7 @@ from .config import settings
 T = TypeVar("T", bound=BaseModel)
 
 # Resolves AWS credentials from environment/IAM roles (SigV4).
-_client = AnthropicBedrock(region_name=settings.aws_region)
+_client = AnthropicBedrock(aws_region=settings.aws_region)
 
 
 def client() -> AnthropicBedrock:
