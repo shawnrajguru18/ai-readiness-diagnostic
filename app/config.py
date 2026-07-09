@@ -33,10 +33,10 @@ class Settings:
     aws_region: str = os.getenv("AWS_REGION", "us-east-1")
 
     # tiers -> Bedrock model IDs (anthropic.* prefix)
-    model_opus: str = os.getenv("AIDIAG_MODEL_OPUS", "anthropic.claude-3-5-sonnet-20241022-v2:0")
-    model_sonnet: str = os.getenv("AIDIAG_MODEL_SONNET", "anthropic.claude-3-5-sonnet-20241022-v2:0")
-    model_haiku: str = os.getenv("AIDIAG_MODEL_HAIKU", "anthropic.claude-3-5-haiku-20241022-v1:0")
-    default_model: str = os.getenv("AIDIAG_MODEL_DEFAULT", "anthropic.claude-3-5-sonnet-20241022-v2:0")
+    model_opus: str = os.getenv("AIDIAG_MODEL_OPUS", "anthropic.claude-opus-4-8")
+    model_sonnet: str = os.getenv("AIDIAG_MODEL_SONNET", "anthropic.claude-sonnet-5")
+    model_haiku: str = os.getenv("AIDIAG_MODEL_HAIKU", "anthropic.claude-haiku-4-5-20251001-v1:0")
+    default_model: str = os.getenv("AIDIAG_MODEL_DEFAULT", "anthropic.claude-sonnet-5")
     effort: str = os.getenv("AIDIAG_EFFORT", "high")
     enable_research: bool = os.getenv("AIDIAG_ENABLE_RESEARCH", "false").lower() == "true"
     sec_user_agent: str = os.getenv("AIDIAG_SEC_USER_AGENT", "DXC AdvisoryX Diagnostic contact@dxc.com")
