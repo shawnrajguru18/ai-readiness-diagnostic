@@ -50,7 +50,7 @@ TASK_DEF_JSON=$(cat <<EOF
       "logConfiguration": {
         "logDriver": "awslogs",
         "options": {
-          "awslogs-group": "/ecs/${APP_NAME}",
+          "awslogs-group": "ecs-${APP_NAME}",
           "awslogs-region": "${AWS_REGION}",
           "awslogs-stream-prefix": "ecs"
         }
@@ -78,7 +78,7 @@ TASK_DEF_ARN="$(aws ecs register-task-definition \
 echo "    ${TASK_DEF_ARN}"
 
 echo "==> Create CloudWatch log group"
-aws logs create-log-group --log-group-name "/ecs/${APP_NAME}" --region "${AWS_REGION}" 2>/dev/null || true
+aws logs create-log-group --log-group-name "ecs-${APP_NAME}" --region "${AWS_REGION}" 2>/dev/null || true
 
 echo "==> Create or update ECS service (Express Mode)"
 SERVICE_EXISTS=$(aws ecs describe-services --region "${AWS_REGION}" \

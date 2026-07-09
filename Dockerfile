@@ -7,6 +7,9 @@ ENV PYTHONUNBUFFERED=1 \
 
 WORKDIR /app
 
+# Install curl for health checks
+RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
+
 # Deps first for layer caching. reportlab/svglib/lxml ship manylinux wheels,
 # so no apt build toolchain is needed on slim.
 COPY requirements.txt .
