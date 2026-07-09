@@ -5,9 +5,12 @@ mapped to current model IDs via app/config.py.
 """
 from __future__ import annotations
 import json
+import logging
 from typing import Any
 
 from ..config import settings, llm_available
+
+logger = logging.getLogger(__name__)
 from ..content import quick_wins_by_id
 from ..models import (
     Submission, PersonaInference, PersonaResult, DimensionScore, Finding,
@@ -50,9 +53,12 @@ def a2_persona(sub: Submission, hint: str | None = None) -> PersonaInference:
         try:
             r: PersonaResult = parse_structured(A2_SYS, [{"role": "user", "content": user}],
                                                 PersonaResult, model=settings.model_sonnet)
+            logger.info("[A2] Used LLM for persona inference")
             return PersonaInference(**r.model_dump())
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"[A2] LLM failed, falling back to deterministic: {e}")
+    else:
+        logger.info("[A2] LLM not available, using deterministic fallback")
     return _persona_fallback(sub, hint)
 
 
@@ -104,9 +110,12 @@ def c2_synthesis(sub: Submission, persona: PersonaInference, dims: list[Dimensio
             adj = {d.dimension: d.research_adjustment for d in r.dimension_reasoning}
             rec = RecommendedNextStep(body=r.recommended_next_step_body,
                                       duration_estimate_weeks=r.duration_estimate_weeks)
+            logger.info(f"[C2] Used LLM for synthesis: {len(findings)} findings, duration {rec.duration_estimate_weeks}w")
             return findings, rec, adj, r.partner_attention_flags
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"[C2] LLM failed, falling back to deterministic: {e}")
+    else:
+        logger.info("[C2] LLM not available, using deterministic fallback")
     return _synthesis_fallback(sub, dims)
 
 
@@ -205,8 +214,11 @@ def c3_quick_wins(sub: Submission, dims: list[DimensionScore]) -> list[SelectedQ
     if llm_available():
         try:
             selected = _c3_llm_refine(sub, dims, candidates, selected)
-        except Exception:
-            pass
+            logger.info(f"[C3] Used LLM for quick wins: {len(selected)} selected")
+        except Exception as e:
+            logger.warning(f"[C3] LLM refinement failed, using deterministic: {e}")
+    else:
+        logger.info(f"[C3] LLM not available, using deterministic selection: {len(selected)} wins")
     return selected
 
 
@@ -283,9 +295,12 @@ def c4_narrative(sub: Submission, persona: PersonaInference, sc: Scorecard) -> E
             r: ExecutiveNarrative = parse_structured(C4_SYS, [{"role": "user", "content": user}],
                                                      ExecutiveNarrative, model=settings.model_opus, max_tokens=4000)
             if r.paragraphs:
+                logger.info(f"[C4] Used LLM for narrative: {len(r.paragraphs)} paragraphs")
                 return r
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"[C4] LLM failed, falling back to deterministic: {e}")
+    else:
+        logger.info("[C4] LLM not available, using deterministic fallback")
     return _narrative_fallback(sub, persona, sc)
 
 
