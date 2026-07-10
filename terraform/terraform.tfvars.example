@@ -1,0 +1,25 @@
+# AWS Configuration
+aws_region = "us-east-1"
+
+# Application Configuration
+app_name    = "ai-readiness-diagnostic"
+environment = "production"
+
+# Docker Image (set this to your ECR repository after first deployment)
+# Format: <account-id>.dkr.ecr.<region>.amazonaws.com/<repo-name>:<tag>
+container_image = "023138541872.dkr.ecr.us-east-1.amazonaws.com/ai-readiness-diagnostic:latest"
+
+# Container Port
+container_port = 8080
+
+# ECS Task Configuration
+task_cpu    = 1024
+task_memory = 2048
+
+# ECS Service Configuration
+desired_count = 1
+
+# Auto Scaling (optional)
+enable_autoscaling = false
+min_capacity       = 1
+max_capacity       = 3
