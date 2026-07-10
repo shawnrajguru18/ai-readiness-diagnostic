@@ -32,11 +32,11 @@ class Settings:
     # AWS region for Bedrock
     aws_region: str = os.getenv("AWS_REGION", "us-east-1")
 
-    # tiers -> Bedrock inference profile IDs (latest Claude models)
-    model_opus: str = os.getenv("AIDIAG_MODEL_OPUS", "us.anthropic.claude-opus-4-8")
-    model_sonnet: str = os.getenv("AIDIAG_MODEL_SONNET", "us.anthropic.claude-sonnet-5")
-    model_haiku: str = os.getenv("AIDIAG_MODEL_HAIKU", "us.anthropic.claude-haiku-4-5-20251001-v1:0")
-    default_model: str = os.getenv("AIDIAG_MODEL_DEFAULT", "us.anthropic.claude-sonnet-5")
+    # tiers -> Bedrock model IDs (Claude 3 direct invocation, no marketplace subscription needed)
+    model_opus: str = os.getenv("AIDIAG_MODEL_OPUS", "anthropic.claude-3-sonnet-20240229-v1:0")
+    model_sonnet: str = os.getenv("AIDIAG_MODEL_SONNET", "anthropic.claude-3-sonnet-20240229-v1:0")
+    model_haiku: str = os.getenv("AIDIAG_MODEL_HAIKU", "anthropic.claude-3-haiku-20240307-v1:0")
+    default_model: str = os.getenv("AIDIAG_MODEL_DEFAULT", "anthropic.claude-3-sonnet-20240229-v1:0")
     effort: str = os.getenv("AIDIAG_EFFORT", "high")
     enable_research: bool = os.getenv("AIDIAG_ENABLE_RESEARCH", "false").lower() == "true"
     sec_user_agent: str = os.getenv("AIDIAG_SEC_USER_AGENT", "DXC AdvisoryX Diagnostic contact@dxc.com")
