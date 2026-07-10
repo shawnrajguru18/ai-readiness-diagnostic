@@ -107,15 +107,6 @@ resource "aws_ecs_service" "app" {
     assign_public_ip = true
   }
 
-  deployment_configuration {
-    maximum_percent         = 200
-    minimum_healthy_percent = 100
-    deployment_circuit_breaker {
-      enable   = true
-      rollback = true
-    }
-  }
-
   tags = local.tags
 
   depends_on = [
