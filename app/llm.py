@@ -40,10 +40,7 @@ def complete_text(
         max_tokens=max_tokens,
         system=system,
         messages=list(messages),
-        output_config={"effort": effort or settings.effort},
     )
-    if thinking:
-        kwargs["thinking"] = {"type": "adaptive"}
     resp = _client.messages.create(**kwargs)
     return "".join(b.text for b in resp.content if b.type == "text").strip()
 
@@ -57,12 +54,7 @@ def parse_structured(
     thinking: bool = True,
     max_tokens: int = 8000,
 ) -> T:
-    """Schema-constrained generation via messages.parse().
-
-    NOTE: messages.parse() sets output_config.format from `output_format`, so we do
-    NOT pass output_config here (effort defaults to high server-side) to avoid clobbering it.
-    Structured outputs are compatible with adaptive thinking.
-    """
+    """Schema-constrained generation via messages.parse()."""
     kwargs: dict[str, Any] = dict(
         model=model or settings.default_model,
         max_tokens=max_tokens,
@@ -70,8 +62,6 @@ def parse_structured(
         messages=list(messages),
         output_format=schema,
     )
-    if thinking:
-        kwargs["thinking"] = {"type": "adaptive"}
     resp = _client.messages.parse(**kwargs)
     parsed = resp.parsed_output
     if parsed is None:
