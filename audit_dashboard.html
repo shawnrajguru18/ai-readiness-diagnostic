@@ -1,0 +1,896 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Audit Dashboard — AI Readiness Diagnostic MVP</title>
+<style>
+:root {
+  --bg-primary: #FFFFFF;
+  --bg-secondary: #F8FAFC;
+  --bg-tertiary: #EFF6FF;
+  --text-primary: #0F172A;
+  --text-secondary: #64748B;
+  --text-tertiary: #94A3B8;
+  --border: #E2E8F0;
+  --accent: #2563EB;
+  --accent-light: #3B82F6;
+  --critical: #DC2626;
+  --high: #EA580C;
+  --medium: #D97706;
+  --low: #10B981;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg-primary: #0F172A;
+    --bg-secondary: #1E293B;
+    --bg-tertiary: #1E3A8A;
+    --text-primary: #F8FAFC;
+    --text-secondary: #CBD5E1;
+    --text-tertiary: #94A3B8;
+    --border: #334155;
+  }
+}
+
+:root[data-theme="light"] {
+  --bg-primary: #FFFFFF;
+  --bg-secondary: #F8FAFC;
+  --bg-tertiary: #EFF6FF;
+  --text-primary: #0F172A;
+  --text-secondary: #64748B;
+  --text-tertiary: #94A3B8;
+  --border: #E2E8F0;
+}
+
+:root[data-theme="dark"] {
+  --bg-primary: #0F172A;
+  --bg-secondary: #1E293B;
+  --bg-tertiary: #1E3A8A;
+  --text-primary: #F8FAFC;
+  --text-secondary: #CBD5E1;
+  --text-tertiary: #94A3B8;
+  --border: #334155;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  color: var(--text-primary);
+  background: var(--bg-primary);
+  line-height: 1.6;
+  font-size: 16px;
+}
+
+.container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+/* Status Banner */
+.status-banner {
+  background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-tertiary) 100%);
+  border-left: 4px solid var(--accent);
+  padding: 20px 24px;
+  border-radius: 8px;
+  margin-bottom: 32px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 24px;
+}
+
+.status-left h1 {
+  font-size: 24px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.status-left p {
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.status-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--medium);
+  color: #FFFFFF;
+  padding: 8px 16px;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.status-badge::before {
+  content: '';
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #FFFFFF;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* Metrics Grid */
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+  margin-bottom: 32px;
+}
+
+.metric-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.metric-label {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-secondary);
+}
+
+.metric-value {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--text-primary);
+  font-family: Monaco, "Courier New", monospace;
+}
+
+.metric-subtext {
+  font-size: 13px;
+  color: var(--text-tertiary);
+}
+
+/* Section Headers */
+h2 {
+  font-size: 20px;
+  font-weight: 600;
+  margin: 32px 0 16px 0;
+  color: var(--text-primary);
+  padding-bottom: 8px;
+  border-bottom: 2px solid var(--border);
+}
+
+/* Risk Category Grid */
+.risk-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 16px;
+  margin-bottom: 32px;
+}
+
+.risk-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.risk-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.risk-card-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.risk-count {
+  background: var(--bg-tertiary);
+  color: var(--accent);
+  font-family: Monaco, monospace;
+  font-weight: 700;
+  font-size: 18px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  min-width: 40px;
+  text-align: center;
+}
+
+.risk-bar-container {
+  display: flex;
+  gap: 4px;
+  align-items: flex-end;
+  height: 40px;
+}
+
+.risk-bar {
+  flex: 1;
+  background: var(--bg-tertiary);
+  border-radius: 2px;
+  position: relative;
+  min-width: 8px;
+}
+
+.risk-bar.critical { background: var(--critical); }
+.risk-bar.high { background: var(--high); }
+.risk-bar.medium { background: var(--medium); }
+.risk-bar.low { background: var(--low); }
+
+.risk-legend {
+  display: flex;
+  gap: 16px;
+  font-size: 12px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+/* Severity Distribution */
+.severity-row {
+  display: grid;
+  grid-template-columns: 1fr 2fr auto;
+  gap: 16px;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.severity-row:last-child {
+  border-bottom: none;
+}
+
+.severity-label {
+  font-weight: 600;
+  font-size: 14px;
+  min-width: 100px;
+}
+
+.severity-bar-outer {
+  background: var(--bg-tertiary);
+  border-radius: 4px;
+  height: 24px;
+  overflow: hidden;
+  position: relative;
+}
+
+.severity-bar-inner {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding-right: 8px;
+  color: #FFFFFF;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.severity-bar-inner.critical { background: var(--critical); }
+.severity-bar-inner.high { background: var(--high); }
+.severity-bar-inner.medium { background: var(--medium); }
+.severity-bar-inner.low { background: var(--low); }
+
+.severity-count {
+  text-align: right;
+  font-family: Monaco, monospace;
+  font-weight: 600;
+  min-width: 60px;
+}
+
+/* Critical Issues Table */
+.issues-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  margin-bottom: 32px;
+}
+
+.issues-table thead {
+  background: var(--bg-tertiary);
+  border-bottom: 2px solid var(--border);
+}
+
+.issues-table th {
+  padding: 12px 16px;
+  text-align: left;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-secondary);
+}
+
+.issues-table td {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+  font-size: 14px;
+  color: var(--text-primary);
+}
+
+.issues-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.severity-badge {
+  display: inline-block;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+}
+
+.severity-badge.critical {
+  background: rgba(220, 38, 38, 0.15);
+  color: var(--critical);
+}
+
+.severity-badge.high {
+  background: rgba(234, 88, 12, 0.15);
+  color: var(--high);
+}
+
+.severity-badge.medium {
+  background: rgba(217, 119, 6, 0.15);
+  color: var(--medium);
+}
+
+.severity-badge.low {
+  background: rgba(16, 185, 129, 0.15);
+  color: var(--low);
+}
+
+.file-path {
+  font-family: Monaco, monospace;
+  font-size: 12px;
+  color: var(--text-secondary);
+  background: var(--bg-tertiary);
+  padding: 2px 6px;
+  border-radius: 3px;
+  word-break: break-all;
+}
+
+/* Recommendations Section */
+.recommendation-block {
+  background: var(--bg-secondary);
+  border-left: 4px solid var(--accent);
+  border-radius: 6px;
+  padding: 20px;
+  margin-bottom: 16px;
+}
+
+.recommendation-title {
+  font-weight: 600;
+  font-size: 15px;
+  margin-bottom: 8px;
+  color: var(--text-primary);
+}
+
+.recommendation-text {
+  font-size: 14px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+.recommendation-effort {
+  display: inline-block;
+  background: var(--bg-tertiary);
+  color: var(--accent);
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  margin-top: 8px;
+}
+
+/* Timeline / Phases */
+.phase-timeline {
+  position: relative;
+  margin-bottom: 32px;
+}
+
+.phase-item {
+  display: grid;
+  grid-template-columns: 120px 1fr;
+  gap: 24px;
+  padding: 20px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-bottom: 12px;
+  position: relative;
+}
+
+.phase-label {
+  font-weight: 600;
+  font-size: 14px;
+  padding: 4px 12px;
+  background: var(--bg-tertiary);
+  color: var(--accent);
+  border-radius: 4px;
+  width: fit-content;
+  height: fit-content;
+  white-space: nowrap;
+}
+
+.phase-content h3 {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: var(--text-primary);
+}
+
+.phase-content p {
+  font-size: 14px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+/* Readiness Gauge */
+.readiness-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 32px;
+}
+
+.readiness-item {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.readiness-title {
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-secondary);
+}
+
+.readiness-status {
+  font-size: 20px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.readiness-status.beta::before { content: '✓'; color: var(--low); }
+.readiness-status.alpha::before { content: '⚠'; color: var(--medium); }
+.readiness-status.restricted::before { content: '✕'; color: var(--critical); }
+
+.readiness-status.beta { color: var(--low); }
+.readiness-status.alpha { color: var(--medium); }
+.readiness-status.restricted { color: var(--critical); }
+
+/* Footer */
+.footer {
+  border-top: 1px solid var(--border);
+  padding-top: 24px;
+  margin-top: 48px;
+  font-size: 12px;
+  color: var(--text-tertiary);
+  text-align: center;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .container {
+    padding: 16px;
+  }
+
+  .status-banner {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .severity-row {
+    grid-template-columns: 1fr;
+  }
+
+  .phase-item {
+    grid-template-columns: 1fr;
+  }
+
+  .issues-table {
+    font-size: 12px;
+  }
+
+  .issues-table th, .issues-table td {
+    padding: 8px 12px;
+  }
+}
+</style>
+</head>
+<body>
+
+<div class="container">
+
+  <!-- Status Banner -->
+  <div class="status-banner">
+    <div class="status-left">
+      <h1>DXC AI Readiness Diagnostic MVP</h1>
+      <p>Master Audit Report — July 10, 2026</p>
+    </div>
+    <div class="status-badge">🟡 Conditional: Go to staging</div>
+  </div>
+
+  <!-- Key Metrics -->
+  <div class="metrics-grid">
+    <div class="metric-card">
+      <div class="metric-label">Overall Status</div>
+      <div class="metric-value">YELLOW</div>
+      <div class="metric-subtext">Functionally complete; security fixes required</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">Total Findings</div>
+      <div class="metric-value">66</div>
+      <div class="metric-subtext">3 critical, 15 high, 29 medium, 19 low</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">Effort to Production</div>
+      <div class="metric-value">30–40h</div>
+      <div class="metric-subtext">3–5 days, one engineer</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">Deployment</div>
+      <div class="metric-value">GO</div>
+      <div class="metric-subtext">Staging now; external traffic blocked</div>
+    </div>
+  </div>
+
+  <!-- Critical Blockers -->
+  <h2>Top Critical Blockers (MVP)</h2>
+  <div class="issues-table-container">
+    <table class="issues-table">
+      <thead>
+        <tr>
+          <th>Issue</th>
+          <th>File</th>
+          <th>Severity</th>
+          <th>Effort</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Content injection in PDF (user input not escaped)</td>
+          <td><span class="file-path">pdf.py:170,178,214</span></td>
+          <td><span class="severity-badge critical">Critical</span></td>
+          <td>3–4h</td>
+        </tr>
+        <tr>
+          <td>Path traversal in fixture loading (no filename validation)</td>
+          <td><span class="file-path">content.py:33</span></td>
+          <td><span class="severity-badge high">High</span></td>
+          <td>2–3h</td>
+        </tr>
+        <tr>
+          <td>.env.example exposes API key; setup instructions unclear</td>
+          <td><span class="file-path">.env.example</span></td>
+          <td><span class="severity-badge critical">Critical</span></td>
+          <td>1h</td>
+        </tr>
+        <tr>
+          <td>Memory exhaustion: unbounded PDF/YAML file sizes</td>
+          <td><span class="file-path">pdf.py:251, content.py:14</span></td>
+          <td><span class="severity-badge high">High</span></td>
+          <td>2–3h</td>
+        </tr>
+        <tr>
+          <td>Missing venv setup for Windows; unclear instructions</td>
+          <td><span class="file-path">README.md</span></td>
+          <td><span class="severity-badge high">High</span></td>
+          <td>1h</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Risk Distribution -->
+  <h2>Findings by Severity</h2>
+  <div style="background: var(--bg-secondary); padding: 20px; border-radius: 8px; margin-bottom: 32px;">
+    <div class="severity-row">
+      <div class="severity-label">Critical</div>
+      <div class="severity-bar-outer">
+        <div class="severity-bar-inner critical" style="width: 5%;">5%</div>
+      </div>
+      <div class="severity-count">3</div>
+    </div>
+    <div class="severity-row">
+      <div class="severity-label">High</div>
+      <div class="severity-bar-outer">
+        <div class="severity-bar-inner high" style="width: 23%;">23%</div>
+      </div>
+      <div class="severity-count">15</div>
+    </div>
+    <div class="severity-row">
+      <div class="severity-label">Medium</div>
+      <div class="severity-bar-outer">
+        <div class="severity-bar-inner medium" style="width: 44%;">44%</div>
+      </div>
+      <div class="severity-count">29</div>
+    </div>
+    <div class="severity-row">
+      <div class="severity-label">Low</div>
+      <div class="severity-bar-outer">
+        <div class="severity-bar-inner low" style="width: 29%;">29%</div>
+      </div>
+      <div class="severity-count">19</div>
+    </div>
+  </div>
+
+  <!-- Risk by Component -->
+  <h2>Findings by Component</h2>
+  <div class="risk-grid">
+    <div class="risk-card">
+      <div class="risk-card-header">
+        <div class="risk-card-title">PDF Generation</div>
+        <div class="risk-count">12</div>
+      </div>
+      <div class="risk-bar-container">
+        <div class="risk-bar critical" style="height: 70%;"></div>
+        <div class="risk-bar critical" style="height: 65%;"></div>
+        <div class="risk-bar high" style="height: 55%;"></div>
+        <div class="risk-bar medium" style="height: 40%;"></div>
+        <div class="risk-bar medium" style="height: 30%;"></div>
+      </div>
+      <div class="risk-legend">
+        <div class="legend-item"><div class="legend-dot critical"></div> 4 crit/high</div>
+      </div>
+    </div>
+
+    <div class="risk-card">
+      <div class="risk-card-header">
+        <div class="risk-card-title">Setup & Configuration</div>
+        <div class="risk-count">10</div>
+      </div>
+      <div class="risk-bar-container">
+        <div class="risk-bar critical" style="height: 75%;"></div>
+        <div class="risk-bar high" style="height: 60%;"></div>
+        <div class="risk-bar high" style="height: 50%;"></div>
+        <div class="risk-bar medium" style="height: 35%;"></div>
+      </div>
+      <div class="risk-legend">
+        <div class="legend-item"><div class="legend-dot critical"></div> 1 crit, 4 high</div>
+      </div>
+    </div>
+
+    <div class="risk-card">
+      <div class="risk-card-header">
+        <div class="risk-card-title">Content Loading & Fixtures</div>
+        <div class="risk-count">5</div>
+      </div>
+      <div class="risk-bar-container">
+        <div class="risk-bar high" style="height: 70%;"></div>
+        <div class="risk-bar high" style="height: 65%;"></div>
+        <div class="risk-bar medium" style="height: 45%;"></div>
+      </div>
+      <div class="risk-legend">
+        <div class="legend-item"><div class="legend-dot high"></div> 2 high</div>
+      </div>
+    </div>
+
+    <div class="risk-card">
+      <div class="risk-card-header">
+        <div class="risk-card-title">Deployment & Infra</div>
+        <div class="risk-count">8</div>
+      </div>
+      <div class="risk-bar-container">
+        <div class="risk-bar high" style="height: 60%;"></div>
+        <div class="risk-bar high" style="height: 55%;"></div>
+        <div class="risk-bar medium" style="height: 40%;"></div>
+        <div class="risk-bar medium" style="height: 35%;"></div>
+      </div>
+      <div class="risk-legend">
+        <div class="legend-item"><div class="legend-dot high"></div> 3 high</div>
+      </div>
+    </div>
+
+    <div class="risk-card">
+      <div class="risk-card-header">
+        <div class="risk-card-title">API Endpoints</div>
+        <div class="risk-count">4</div>
+      </div>
+      <div class="risk-bar-container">
+        <div class="risk-bar medium" style="height: 50%;"></div>
+        <div class="risk-bar medium" style="height: 45%;"></div>
+        <div class="risk-bar low" style="height: 30%;"></div>
+      </div>
+      <div class="risk-legend">
+        <div class="legend-item"><div class="legend-dot medium"></div> All med/low</div>
+      </div>
+    </div>
+
+    <div class="risk-card">
+      <div class="risk-card-header">
+        <div class="risk-card-title">Other Components</div>
+        <div class="risk-count">27</div>
+      </div>
+      <div class="risk-bar-container">
+        <div class="risk-bar low" style="height: 40%;"></div>
+        <div class="risk-bar low" style="height: 35%;"></div>
+        <div class="risk-bar low" style="height: 30%;"></div>
+      </div>
+      <div class="risk-legend">
+        <div class="legend-item"><div class="legend-dot low"></div> Mostly low</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Readiness Assessment -->
+  <h2>Readiness by Dimension</h2>
+  <div class="readiness-grid">
+    <div class="readiness-item">
+      <div class="readiness-title">Functionality</div>
+      <div class="readiness-status beta">Beta</div>
+      <p style="font-size: 12px; color: var(--text-secondary);">Core features verified</p>
+    </div>
+    <div class="readiness-item">
+      <div class="readiness-title">Security</div>
+      <div class="readiness-status restricted">Restricted</div>
+      <p style="font-size: 12px; color: var(--text-secondary);">Critical vulnerabilities</p>
+    </div>
+    <div class="readiness-item">
+      <div class="readiness-title">Documentation</div>
+      <div class="readiness-status alpha">Alpha</div>
+      <p style="font-size: 12px; color: var(--text-secondary);">Setup guide incomplete</p>
+    </div>
+    <div class="readiness-item">
+      <div class="readiness-title">Operations</div>
+      <div class="readiness-status alpha">Alpha</div>
+      <p style="font-size: 12px; color: var(--text-secondary);">No health checks</p>
+    </div>
+    <div class="readiness-item">
+      <div class="readiness-title">Testing</div>
+      <div class="readiness-status beta">Beta</div>
+      <p style="font-size: 12px; color: var(--text-secondary);">Smoke tests pass</p>
+    </div>
+    <div class="readiness-item">
+      <div class="readiness-title">Overall</div>
+      <div class="readiness-status alpha">Conditional</div>
+      <p style="font-size: 12px; color: var(--text-secondary);">Staging OK; no traffic</p>
+    </div>
+  </div>
+
+  <!-- Critical Path Phases -->
+  <h2>Critical Path to Production</h2>
+  <div class="phase-timeline">
+    <div class="phase-item">
+      <div class="phase-label">Phase 1</div>
+      <div class="phase-content">
+        <h3>Security Hardening (Blocking)</h3>
+        <p><strong>Effort:</strong> 12–16 hours</p>
+        <p style="margin-top: 8px;">Fix content injection (PDF), path traversal (fixtures), memory exhaustion. Must complete before external traffic.</p>
+      </div>
+    </div>
+
+    <div class="phase-item">
+      <div class="phase-label">Phase 2</div>
+      <div class="phase-content">
+        <h3>Documentation & Setup (Critical)</h3>
+        <p><strong>Effort:</strong> 8–10 hours</p>
+        <p style="margin-top: 8px;">Update README (OS-specific venv), .env.example (no real keys), DEPLOY_AWS.md (Bedrock regions, VPC). Required before team handoff.</p>
+      </div>
+    </div>
+
+    <div class="phase-item">
+      <div class="phase-label">Phase 3</div>
+      <div class="phase-content">
+        <h3>Resilience & Error Handling (Reliability)</h3>
+        <p><strong>Effort:</strong> 6–8 hours</p>
+        <p style="margin-top: 8px;">Add health checks (Dockerfile), YAML schema validation, DynamoDB retry logic. Required before scaling.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Key Recommendations -->
+  <h2>Immediate Actions</h2>
+  <div style="display: grid; gap: 16px; margin-bottom: 32px;">
+    <div class="recommendation-block">
+      <div class="recommendation-title">1. Escape all user input in PDF generation</div>
+      <div class="recommendation-text">Create <code style="background: var(--bg-tertiary); padding: 2px 6px; border-radius: 3px;">escape_pdf_text()</code> utility. Apply to company_name, tier labels, finding headlines/bodies, contact fields.</div>
+      <div class="recommendation-effort">Effort: 3–4 hours</div>
+    </div>
+
+    <div class="recommendation-block">
+      <div class="recommendation-title">2. Validate fixture path traversal</div>
+      <div class="recommendation-text">Check that <code style="background: var(--bg-tertiary); padding: 2px 6px; border-radius: 3px;">(FIXTURE_DIR / name.yaml).resolve().parent == FIXTURE_DIR</code>. Add unit test with <code style="background: var(--bg-tertiary); padding: 2px 6px; border-radius: 3px;">../../secrets.yaml</code>.</div>
+      <div class="recommendation-effort">Effort: 2–3 hours</div>
+    </div>
+
+    <div class="recommendation-block">
+      <div class="recommendation-title">3. Add size caps for PDF and YAML</div>
+      <div class="recommendation-text">Cap PDF to 50 MB, YAML files to 10 MB. Raise clear errors early, not silent failures.</div>
+      <div class="recommendation-effort">Effort: 1–2 hours</div>
+    </div>
+
+    <div class="recommendation-block">
+      <div class="recommendation-title">4. Fix .env.example and README setup</div>
+      <div class="recommendation-text">Remove example API keys (use placeholders). Add OS-specific venv activation (Windows PowerShell/Bash, macOS, Linux). Document offline vs. with-key vs. Bedrock modes.</div>
+      <div class="recommendation-effort">Effort: 1–2 hours</div>
+    </div>
+
+    <div class="recommendation-block">
+      <div class="recommendation-title">5. Document Bedrock configuration</div>
+      <div class="recommendation-text">Update DEPLOY_AWS.md with per-region Bedrock setup, VPC verification commands, DynamoDB 400 KB item size warning, health check implementation.</div>
+      <div class="recommendation-effort">Effort: 2–3 hours</div>
+    </div>
+  </div>
+
+  <!-- Timeline Overview -->
+  <h2>Timeline Estimate</h2>
+  <div class="metrics-grid">
+    <div class="metric-card">
+      <div class="metric-label">Phase 1 + 2</div>
+      <div class="metric-value">5–6d</div>
+      <div class="metric-subtext">Security + docs; can parallelize</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">Phase 3</div>
+      <div class="metric-value">2–3d</div>
+      <div class="metric-subtext">Resilience & monitoring</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">Buffer & Validation</div>
+      <div class="metric-value">2–3d</div>
+      <div class="metric-subtext">Review, UAT, demo</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">Total Duration</div>
+      <div class="metric-value">8–12d</div>
+      <div class="metric-subtext">At 50% utilization</div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div class="footer">
+    <p>DXC AI Readiness Diagnostic MVP — Master Audit Report</p>
+    <p style="margin-top: 8px;">Assessment Date: July 10, 2026 | Contact: Shawn Rajguru (shawn.rajguru@dxc.com)</p>
+    <p style="margin-top: 8px;">For detailed findings, see MASTER_AUDIT_REPORT.md</p>
+  </div>
+
+</div>
+
+</body>
+</html>

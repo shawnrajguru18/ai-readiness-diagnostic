@@ -1,0 +1,219 @@
+[
+  {
+    "file": "README.md",
+    "area": "Local development setup",
+    "summary": "Virtual environment activation uses incorrect path (.venv/Scripts/activate on Windows assumes PowerShell). Linux/macOS uses . .venv/bin/activate. No guidance for which shell/OS.",
+    "severity": "high",
+    "fix_recommendation": "Add OS-specific setup instructions: 'Windows (PowerShell): .venv\\Scripts\\Activate.ps1; Windows (Git Bash): . .venv/Scripts/activate; Linux/macOS: . .venv/bin/activate'. Note that .venv directory doesn't exist in git, so add step: 'Create venv: python -m venv .venv' before activation."
+  },
+  {
+    "file": "README.md",
+    "area": "Dependencies installation",
+    "summary": "Missing explicit instruction to install dependencies before running the app. The venv is mentioned as 'already created', which is misleading—it's gitignored and not in the repo.",
+    "severity": "high",
+    "fix_recommendation": "Add explicit step after venv activation: 'pip install -r requirements.txt'. Update venv creation instruction to include both creation and installation."
+  },
+  {
+    "file": "README.md",
+    "area": "Model access & offline mode",
+    "summary": "Brief mention of 'ANTHROPIC_API_KEY' to enable LLM agents, but missing clear explanation that app runs fully offline without it. No mention of AWS Bedrock being preferred in production or local Anthropic API key setup.",
+    "severity": "medium",
+    "fix_recommendation": "Add section explaining: '(1) Offline (default): deterministic scoring, no API key needed. (2) With ANTHROPIC_API_KEY: Claude agents enrich findings/quick-wins. (3) Deployment: AWS Bedrock via IAM (no key needed).'"
+  },
+  {
+    "file": ".env.example",
+    "area": "API key exposure & outdated example",
+    "summary": "File contains a real-looking API key in the ANTHROPIC_API_KEY field (appears to be from an old version). Even if fake, this is a bad practice that could confuse developers.",
+    "severity": "critical",
+    "fix_recommendation": "Replace the example value with a clearly fake placeholder like '# sk-your-key-here' or 'sk-example-key-do-not-use'. Add comment: '# Never commit actual API keys. Use .env.local or environment variables for secrets.'"
+  },
+  {
+    "file": ".env.example",
+    "area": "Incomplete model configuration documentation",
+    "summary": "Comments mention 'AIDIAG_MODEL_OPUS/SONNET/HAIKU' but the file only shows generic 'AIDIAG_MODEL_DEFAULT'. The real model override variables used in config.py (AIDIAG_MODEL_OPUS, AIDIAG_MODEL_SONNET, etc.) are not documented.",
+    "severity": "medium",
+    "fix_recommendation": "Update .env.example to list all actual env vars from app/config.py: AIDIAG_MODEL_OPUS, AIDIAG_MODEL_SONNET, AIDIAG_MODEL_HAIKU. Add example values showing Bedrock format (anthropic.claude-3-5-sonnet-...)."
+  },
+  {
+    "file": "app/config.py",
+    "area": "Environment variable documentation",
+    "summary": "AIDIAG_MODEL_OPUS defaults to 'anthropic.claude-3-sonnet-20240229-v1:0' but is named 'OPUS'. Misleading naming—comment says 'Opus' but default is 'Sonnet'. Also missing documentation that these are Bedrock model IDs, not API model names.",
+    "severity": "high",
+    "fix_recommendation": "Add docstring to Settings class explaining: '(1) These are AWS Bedrock model IDs (anthropic.* prefix). (2) AIDIAG_MODEL_OPUS defaults to Sonnet due to cost; update if Opus is needed. (3) For local dev with ANTHROPIC_API_KEY, set AIDIAG_MODEL_DEFAULT to a Claude API model name (claude-3-5-sonnet-20241022).'"
+  },
+  {
+    "file": "app/config.py",
+    "area": "Missing llm_available() documentation",
+    "summary": "Function only documents 'True when AWS credentials are configured' but doesn't explain what it checks or that it can also work with ANTHROPIC_API_KEY in local dev.",
+    "severity": "low",
+    "fix_recommendation": "Update docstring: 'Returns True if AWS credentials (for Bedrock) or ANTHROPIC_API_KEY are available. Pipeline runs offline (deterministic fallback) if False.'"
+  },
+  {
+    "file": "app/models.py",
+    "area": "Missing docstrings on Pydantic models",
+    "summary": "Models like Submission, ConsentRecord, QuestionResponse lack docstrings explaining their purpose in the pipeline. Field descriptions are sparse (e.g., 'size_band' has no comment).",
+    "severity": "medium",
+    "fix_recommendation": "Add class docstrings to all top-level models (Submission, ConsentRecord, PersonaInference, QuestionResponse, Scorecard, Session). Add 'description=' to Field() for complex fields like size_band, industry_tag."
+  },
+  {
+    "file": "app/api.py",
+    "area": "Missing endpoint documentation",
+    "summary": "Endpoints are listed in module docstring at top, but individual endpoint functions lack docstrings explaining request/response schemas, error codes, or when to use each.",
+    "severity": "medium",
+    "fix_recommendation": "Add docstrings to each endpoint function (questions, assess, fixture, review_queue, review_detail, scorecard_pdf, etc.) with: brief description, expected request format, response structure, error cases (404, 400, etc.)."
+  },
+  {
+    "file": "app/api.py",
+    "area": "Unclear AssessRequest schema",
+    "summary": "AssessRequest includes 'persona_hint: Optional[str]' but its valid values (P1/P2/P3) are undocumented. Client code has no way to know what values are accepted.",
+    "severity": "medium",
+    "fix_recommendation": "Add field docstring to persona_hint: 'Optional persona hint (P1=executive sponsor, P2=operational owner, P3=financial scrutineer). If omitted, inferred from prospect_role.' Also add to endpoint docstring."
+  },
+  {
+    "file": "app/orchestrator.py",
+    "area": "Missing pipeline step documentation",
+    "summary": "run_pipeline() function has a docstring but doesn't explain what each stage (A1, A2, B, C2, C3, D1, D2) does. The inline comments only show stage name, not purpose.",
+    "severity": "high",
+    "fix_recommendation": "Expand run_pipeline() docstring with detailed explanation of each stage:\n- A1: Consent validation\n- A2: Persona inference\n- B1-B3: Research (optional)\n- C2: Synthesis (findings + next step)\n- C3: Quick wins selection\n- D1: Scorecard assembly\n- D2: Validation"
+  },
+  {
+    "file": "app/scoring.py",
+    "area": "Missing docstring on public scoring functions",
+    "summary": "score_dimensions() and overall_score() have no docstrings. apply_research_adjustments is imported but not documented.",
+    "severity": "medium",
+    "fix_recommendation": "Add docstrings:\n- score_dimensions(responses): 'Returns list[DimensionScore] from questionnaire responses. Handles skip/branch logic via renormalization. Regulatory Complexity is informational.'\n- overall_score(dimensions): 'Returns 0-100 overall score from weighted dimension scores.'"
+  },
+  {
+    "file": "app/llm.py",
+    "area": "Incomplete function documentation",
+    "summary": "complete_text() function docstring is minimal (only 'free-text generation'). Doesn't explain thinking, effort levels, or when to use vs parse_structured().",
+    "severity": "medium",
+    "fix_recommendation": "Expand docstrings:\n- complete_text(): 'Generate free-form text. Uses adaptive thinking (Claude 4+) by default. effort=high by default. Returns concatenated text blocks from all response messages.'\n- parse_structured(): 'Generate schema-constrained JSON output. Returns instance of schema. Raises RuntimeError if parsing fails or model refuses.'"
+  },
+  {
+    "file": "app/store.py",
+    "area": "Missing backend selection explanation",
+    "summary": "Module docstring explains AIDIAG_DDB_TABLE env var, but doesn't explain how to switch backends or why. Developers may not realize in-memory store is ephemeral.",
+    "severity": "medium",
+    "fix_recommendation": "Add section to docstring: 'Backend Selection: (1) Local dev (default): in-memory store, state lost on restart. (2) Production: set AIDIAG_DDB_TABLE=ai-readiness-sessions to use DynamoDB. Both backends expose identical API (put/get/all_records).'"
+  },
+  {
+    "file": "app/agents/__init__.py",
+    "area": "Missing agent fallback behavior explanation",
+    "summary": "Each agent (a2_persona, c2_synthesis, etc.) mentions 'falls back' but doesn't document what the fallback does, confidence levels, or quality differences.",
+    "severity": "high",
+    "fix_recommendation": "Add docstring to each agent function explaining: (1) LLM behavior (prompt, model, effort), (2) fallback behavior (deterministic logic), (3) confidence levels in each case, (4) when fallback is triggered (no API key, LLM error, etc.)."
+  },
+  {
+    "file": "app/content.py",
+    "area": "Missing loader function docstrings",
+    "summary": "Functions like load_question_pool(), load_fixture() have no docstrings. Developers don't know what format they return or where data comes from.",
+    "severity": "medium",
+    "fix_recommendation": "Add docstrings:\n- load_question_pool(): 'Returns dict with keys: questions (list), dimensions (dict). Cached after first load.'\n- load_fixture(name): 'Load demo fixture YAML. Returns dict with submission, consent, responses, persona_hint.'\n- quick_wins_by_id(): 'Returns dict[pattern_id -> quick_win_dict]. Loads from content/quick_wins.yaml.'"
+  },
+  {
+    "file": "deploy/aws/DEPLOY_AWS.md",
+    "area": "Bedrock model access prerequisite",
+    "summary": "Documentation mentions checking 'Bedrock → Model Access' in console but doesn't explain that models are controlled per-region. Developers may miss enabling models in non-us-east-1 regions.",
+    "severity": "medium",
+    "fix_recommendation": "Expand Bedrock section: 'Models must be enabled per-region in AWS Bedrock console. If deploying to us-west-2, navigate to Bedrock in that region and enable anthropic.claude-3-5-sonnet-... and anthropic.claude-3-5-haiku-... under Model Access.'"
+  },
+  {
+    "file": "deploy/aws/DEPLOY_AWS.md",
+    "area": "DynamoDB item size limit not explained",
+    "summary": "Mentions '400 KB item limit' but doesn't explain what happens if a session exceeds it (error? silent truncation?) or how to monitor/debug.",
+    "severity": "low",
+    "fix_recommendation": "Add: 'If sessions exceed 400 KB, the put will fail with a DynamoDB ValidationException. Monitor via CloudWatch logs. If this occurs, consider archiving old sessions to a separate table.'"
+  },
+  {
+    "file": "deploy/aws/DEPLOY_AWS.md",
+    "area": "Incomplete VPC setup instructions",
+    "summary": "States 'Default VPC with at least one subnet and security group' but doesn't explain how to verify this or create one if missing.",
+    "severity": "medium",
+    "fix_recommendation": "Add detailed VPC setup section: 'To check: aws ec2 describe-vpcs --filters Name=isDefault,Values=true. To create: aws ec2 create-default-vpc. To verify subnets: aws ec2 describe-subnets.'"
+  },
+  {
+    "file": "deploy/aws/DEPLOY_AWS.md",
+    "area": "Missing environment variable setup for local development",
+    "summary": "Deployment guide focuses on AWS resources but doesn't explain how to set environment variables locally for testing. Developers may not know about AIDIAG_MODEL_* or AIDIAG_DDB_TABLE.",
+    "severity": "medium",
+    "fix_recommendation": "Add 'Local Testing' section explaining: 'To test with Bedrock (before deployment): export AWS_REGION=us-east-1 and ensure AWS credentials are in ~/.aws/credentials. The app auto-detects and uses Bedrock if credentials are found.'"
+  },
+  {
+    "file": "terraform/README.md",
+    "area": "Missing Terraform backend warning",
+    "summary": "Documents local terraform.tfstate storage but doesn't warn about the security implications or strongly recommend remote backend for team use.",
+    "severity": "medium",
+    "fix_recommendation": "Add prominent warning: 'WARNING: terraform.tfstate contains sensitive data (IAM role ARNs, DynamoDB table names). Never commit it to git. For team use, immediately set up S3 remote backend as shown in State Management section.'"
+  },
+  {
+    "file": "terraform/README.md",
+    "area": "Incomplete ECR image pushup instructions",
+    "summary": "Push Docker Image section shows a template but doesn't explain how to get <account-id> or what to do if docker login fails (e.g., region mismatch, IAM permissions).",
+    "severity": "medium",
+    "fix_recommendation": "Add: 'Your AWS account ID: aws sts get-caller-identity --query Account. If docker login fails with \"denied\": check IAM permissions for ecr:GetAuthorizationToken. If region mismatch error: add --region us-east-1 to aws ecr get-login-password command.'"
+  },
+  {
+    "file": "ELEVENLABS_AGENT_SETUP.md",
+    "area": "Tool parameter schema missing required/optional clarity",
+    "summary": "JSON schema for record_answer and finish_interview shows type info but doesn't clearly state which parameters are required. Developers may pass missing fields.",
+    "severity": "medium",
+    "fix_recommendation": "Add clarity to the JSON schema:\n- record_answer: question_id is required; only ONE of option_id / scale_value / option_ids should be set based on question type.\n- finish_interview: no parameters required.\nAdd examples showing each question type's correct call."
+  },
+  {
+    "file": "ELEVENLABS_AGENT_SETUP.md",
+    "area": "Allowed origins configuration vague",
+    "summary": "States 'add the site origin (e.g. http://localhost:8000, your deployed domain)' but doesn't explain CORS, how to add multiple origins, or what happens if origin is wrong.",
+    "severity": "medium",
+    "fix_recommendation": "Add: 'In ElevenLabs agent settings, set Allowed Origins to a comma-separated list: http://localhost:8000,https://yourdomain.com. The agent will reject calls from other origins with CORS error. For local testing, use http://localhost:8000 (include port).'"
+  },
+  {
+    "file": "ELEVENLABS_AGENT_SETUP.md",
+    "area": "Voice agent error handling not documented",
+    "summary": "System prompt explains happy path (greet, ask questions, close) but doesn't document error cases: invalid question_id, tool call failure, network error during record_answer.",
+    "severity": "medium",
+    "fix_recommendation": "Add section: 'Error Handling: If record_answer returns an error, acknowledge gracefully (e.g., \"Let me retry that\"). If finish_interview fails, inform the prospect that the scorecard may not be generated and provide a fallback contact method.'"
+  },
+  {
+    "file": "Dockerfile",
+    "area": "Missing health check definition",
+    "summary": "Dockerfile installs curl for health checks but doesn't define a HEALTHCHECK instruction. ECS/App Runner may not know if the app is ready.",
+    "severity": "medium",
+    "fix_recommendation": "Add HEALTHCHECK instruction: 'HEALTHCHECK --interval=10s --timeout=3s --start-period=5s --retries=3 CMD curl -f http://localhost:${PORT:-8080}/ || exit 1'"
+  },
+  {
+    "file": "tests/test_smoke.py",
+    "area": "Missing test documentation",
+    "summary": "Test file has no module docstring or comment explaining what each test verifies. Test names are descriptive but lack context on why these specific checks matter.",
+    "severity": "low",
+    "fix_recommendation": "Add module docstring: 'Offline smoke tests verifying: (1) content integrity (20 questions, 6 dimensions, weight sums), (2) deterministic scoring against Companion 01 spec, (3) skip/branch logic (Q3.2/Q3.3 skipped when Q3.1=A), (4) three demo fixtures score correctly.'"
+  },
+  {
+    "file": "README.md",
+    "area": "Missing API documentation link",
+    "summary": "README lists FastAPI endpoints in comments but doesn't link to interactive API docs (FastAPI auto-generates Swagger UI).",
+    "severity": "low",
+    "fix_recommendation": "Add note in README: 'Interactive API docs: http://localhost:8000/docs (Swagger UI). Use this to test endpoints, see request/response schemas, try out the API.'"
+  },
+  {
+    "file": "Content files (UI_Design_Project_Brief.md, Companion_*.md)",
+    "area": "Missing links from main README",
+    "summary": "Multiple companion docs exist but are not referenced in README.md or project structure. New developers won't know about them.",
+    "severity": "low",
+    "fix_recommendation": "Add 'References' section at bottom of README.md linking to: 'See Companion_01_Questionnaire_Specification.md for question design, Companion_04_Agent_Prompts.md for LLM agent logic, UI_Design_Project_Brief.md for design system.'"
+  },
+  {
+    "file": "README.md",
+    "area": "Model tiering explanation incomplete",
+    "summary": "States 'Opus → C2/C3/D2, Sonnet → A2/B/D1, Haiku → A1' but doesn't explain why this tiering exists (cost vs quality tradeoff) or how to override it.",
+    "severity": "medium",
+    "fix_recommendation": "Add explanation: 'Model tiering balances cost and quality: Opus for hardest reasoning (C2/C3/D2), Sonnet for mid-tier (A2/B/D1), Haiku for simple intake (A1). Override via AIDIAG_MODEL_* env vars. See app/config.py.'"
+  },
+  {
+    "file": "scripts/run_chat_cli.py (if exists)",
+    "area": "CLI runner documentation missing",
+    "summary": "README references 'python -m scripts.run_chat_cli --fixture meridianfs' but doesn't document the CLI tool's full usage, options, or what it does.",
+    "severity": "medium",
+    "fix_recommendation": "Add section to README: 'CLI Runner: Run pipeline offline on a fixture without the web UI. python -m scripts.run_chat_cli --fixture [meridianfs|northerncare|aureliantech]. Use this for testing scoring logic.'"
+  }
+]

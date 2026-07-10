@@ -85,12 +85,17 @@ resource "aws_ecs_task_definition" "app" {
   tags = local.tags
 }
 
-# Get default subnets
+# Get default subnets (only if not provided via variable)
 data "aws_subnets" "default" {
+  count = length(var.subnet_ids) > 0 ? 0 : 1
   filter {
     name   = "vpc-id"
-    values = [data.aws_vpc.default.id]
+    values = [local.vpc_id]
   }
+}
+
+locals {
+  subnet_ids = length(var.subnet_ids) > 0 ? var.subnet_ids : data.aws_subnets.default[0].ids
 }
 
 # ECS Service
@@ -102,7 +107,7 @@ resource "aws_ecs_service" "app" {
   launch_type     = "FARGATE"
 
   network_configuration {
-    subnets          = data.aws_subnets.default.ids
+    subnets          = local.subnet_ids
     security_groups  = [aws_security_group.ecs_tasks.id]
     assign_public_ip = true
   }

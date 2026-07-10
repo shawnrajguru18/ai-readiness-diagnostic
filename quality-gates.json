@@ -1,0 +1,273 @@
+{
+  "version": "1.0",
+  "name": "AI Diagnostic MVP - Quality Gates",
+  "description": "Quality gates for automated CI/CD pipeline. Defines pass/fail thresholds for all checks.",
+  "lastUpdated": "2026-07-10",
+
+  "testing": {
+    "coverage": {
+      "minimum": 80,
+      "target": 90,
+      "unit": "percent",
+      "description": "Minimum code coverage required"
+    },
+    "vulnerabilityTests": {
+      "tier1": {
+        "status": "CRITICAL",
+        "failBuild": true,
+        "description": "Tier 1 (Security) tests - MUST PASS"
+      },
+      "tier2": {
+        "status": "HIGH",
+        "failBuild": true,
+        "description": "Tier 2 (Data Integrity) tests - MUST PASS"
+      },
+      "tier3": {
+        "status": "MEDIUM",
+        "failBuild": false,
+        "description": "Tier 3 (Resilience) tests - WARN if fail"
+      },
+      "tier4": {
+        "status": "LOW",
+        "failBuild": false,
+        "description": "Tier 4 (Validation) tests - WARN if fail"
+      }
+    }
+  },
+
+  "codeQuality": {
+    "formatting": {
+      "tool": "black",
+      "failBuild": true,
+      "maxLineLength": 120,
+      "description": "Code must be formatted with black"
+    },
+    "imports": {
+      "tool": "isort",
+      "failBuild": true,
+      "profile": "black",
+      "description": "Imports must be sorted with isort (black profile)"
+    },
+    "linting": {
+      "flake8": {
+        "enabled": true,
+        "failBuild": false,
+        "maxLineLength": 120,
+        "ignoreErrors": ["E203", "W503"],
+        "description": "flake8 linting - warn on violations"
+      },
+      "pylint": {
+        "enabled": true,
+        "failBuild": false,
+        "minScore": 7.0,
+        "description": "pylint code analysis - warn on low scores"
+      }
+    },
+    "typeChecking": {
+      "tool": "mypy",
+      "failBuild": false,
+      "ignoreUntyped": true,
+      "description": "mypy type checking - informational only"
+    },
+    "complexity": {
+      "cyclomatic": {
+        "maximum": 10,
+        "failBuild": false,
+        "description": "Cyclomatic complexity - warn if exceeds maximum"
+      },
+      "maintainability": {
+        "minimum": 70,
+        "failBuild": false,
+        "description": "Maintainability index - warn if below minimum"
+      }
+    }
+  },
+
+  "security": {
+    "sast": {
+      "bandit": {
+        "enabled": true,
+        "failBuild": true,
+        "severity": "HIGH",
+        "description": "Python SAST - fail on HIGH/CRITICAL"
+      },
+      "semgrep": {
+        "enabled": true,
+        "failBuild": false,
+        "rulesets": ["p/python", "p/security-audit", "p/owasp-top-ten"],
+        "description": "Pattern-based security - warn on matches"
+      },
+      "codeql": {
+        "enabled": true,
+        "failBuild": false,
+        "description": "GitHub CodeQL - informational"
+      }
+    },
+    "dependencies": {
+      "pipAudit": {
+        "enabled": true,
+        "failBuild": true,
+        "maxVulnerabilities": 0,
+        "description": "Scan Python dependencies for CVEs"
+      },
+      "snyk": {
+        "enabled": false,
+        "failBuild": false,
+        "description": "Optional: Snyk for comprehensive dependency scanning"
+      }
+    },
+    "secrets": {
+      "detection": {
+        "enabled": true,
+        "failBuild": true,
+        "tools": ["truffleHog", "detectSecrets"],
+        "description": "Detect hardcoded secrets and API keys"
+      },
+      "patterns": {
+        "apiKeys": true,
+        "awsCredentials": true,
+        "stripeKeys": true,
+        "jwtTokens": true,
+        "description": "Check for common credential patterns"
+      }
+    },
+    "infrastructure": {
+      "tfsec": {
+        "enabled": true,
+        "failBuild": true,
+        "severity": "HIGH",
+        "description": "Terraform security scan - fail on HIGH/CRITICAL"
+      },
+      "dockerScanning": {
+        "enabled": true,
+        "tool": "trivy",
+        "failBuild": true,
+        "severity": "CRITICAL,HIGH",
+        "description": "Container vulnerability scanning"
+      }
+    }
+  },
+
+  "performance": {
+    "latency": {
+      "fixtureEndpoint": {
+        "threshold": 100,
+        "unit": "milliseconds",
+        "description": "Fixture endpoint should respond < 100ms"
+      },
+      "assessEndpoint": {
+        "threshold": 500,
+        "unit": "milliseconds",
+        "description": "Assess endpoint baseline (LLM-dependent)"
+      }
+    },
+    "memory": {
+      "peakUsage": {
+        "threshold": 100,
+        "unit": "megabytes",
+        "description": "Peak memory for 10 concurrent requests < 100MB"
+      }
+    },
+    "concurrency": {
+      "minConcurrentRequests": 5,
+      "description": "Should handle at least 5 concurrent requests"
+    }
+  },
+
+  "accessibility": {
+    "wcag": {
+      "level": "AA",
+      "failBuild": false,
+      "tools": ["pa11y", "axe"],
+      "description": "WCAG 2.1 AA compliance - informational"
+    },
+    "colorContrast": {
+      "failBuild": false,
+      "description": "Check color contrast ratios - informational"
+    }
+  },
+
+  "deployment": {
+    "preDeployment": {
+      "allTestsPassing": {
+        "required": true,
+        "tiers": ["tier1", "tier2"],
+        "description": "Tier 1 & 2 tests must pass"
+      },
+      "coverageAbove80": {
+        "required": true,
+        "minimum": 80,
+        "description": "Code coverage >= 80%"
+      },
+      "noUncommittedChanges": {
+        "required": true,
+        "description": "Working tree must be clean"
+      },
+      "changelogUpdated": {
+        "required": false,
+        "description": "CHANGELOG should be updated"
+      },
+      "versionBumped": {
+        "required": false,
+        "description": "Version should be incremented (semantic versioning)"
+      },
+      "terraformValidated": {
+        "required": true,
+        "description": "Terraform configuration must validate"
+      },
+      "dockerImageBuilds": {
+        "required": true,
+        "description": "Docker image must build successfully"
+      },
+      "noSecurityVulnerabilities": {
+        "required": true,
+        "tools": ["tfsec", "trivy"],
+        "severity": "CRITICAL,HIGH",
+        "description": "No critical/high vulnerabilities in infra or containers"
+      }
+    },
+    "postDeployment": {
+      "healthCheckEndpoint": {
+        "expected": 200,
+        "timeout": 30,
+        "description": "Health endpoint should return 200 within 30s"
+      },
+      "databaseConnectivity": {
+        "required": true,
+        "description": "Database/DynamoDB should be accessible"
+      },
+      "externalServices": {
+        "bedrockAccess": {
+          "required": true,
+          "description": "AWS Bedrock should be accessible"
+        }
+      }
+    }
+  },
+
+  "notifications": {
+    "slack": {
+      "enabled": false,
+      "channel": "#deployments",
+      "notifyOn": ["FAILURE", "SECURITY_ISSUE"],
+      "description": "Send Slack notifications on important events"
+    },
+    "email": {
+      "enabled": false,
+      "recipients": ["shawn.rajguru@dxc.com"],
+      "notifyOn": ["FAILURE"],
+      "description": "Send email notifications on failures"
+    }
+  },
+
+  "versioning": {
+    "semanticVersioning": {
+      "enabled": true,
+      "description": "Use semantic versioning (MAJOR.MINOR.PATCH)"
+    },
+    "changelogFormat": {
+      "format": "keepachangelog",
+      "description": "Follow Keep a Changelog format"
+    }
+  }
+}

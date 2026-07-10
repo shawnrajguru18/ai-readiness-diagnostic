@@ -1,0 +1,159 @@
+name: Test Suite (Evaluation + Unit Tests)
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.11', '3.12']
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-asyncio pytest-cov pytest-timeout pytest-xdist httpx
+
+      - name: Run unit tests
+        run: |
+          pytest tests/test_smoke.py tests/test_store.py -v --tb=short
+        timeout-minutes: 5
+
+      - name: Run evaluation suite (TIER 1: Security)
+        id: tier1
+        run: |
+          pytest tests/test_evaluation_suite.py::TestPromptInjection -v --tb=short \
+            || echo "TIER1_FAILED=true" >> $GITHUB_ENV
+          pytest tests/test_evaluation_suite.py::TestPathTraversal -v --tb=short \
+            || echo "TIER1_FAILED=true" >> $GITHUB_ENV
+          pytest tests/test_evaluation_suite.py::TestHeaderInjection -v --tb=short \
+            || echo "TIER1_FAILED=true" >> $GITHUB_ENV
+          pytest tests/test_evaluation_suite.py::TestCORSMisconfiguration -v --tb=short \
+            || echo "TIER1_FAILED=true" >> $GITHUB_ENV
+          pytest tests/test_evaluation_suite.py::TestEmailValidation -v --tb=short \
+            || echo "TIER1_FAILED=true" >> $GITHUB_ENV
+          pytest tests/test_evaluation_suite.py::TestURLValidation -v --tb=short \
+            || echo "TIER1_FAILED=true" >> $GITHUB_ENV
+        continue-on-error: true
+        timeout-minutes: 10
+
+      - name: Run evaluation suite (TIER 2: Data Integrity)
+        id: tier2
+        run: |
+          pytest tests/test_evaluation_suite.py::TestRaceConditionDynamoDB -v --tb=short \
+            || echo "TIER2_FAILED=true" >> $GITHUB_ENV
+          pytest tests/test_evaluation_suite.py::TestReviewDecisionRace -v --tb=short \
+            || echo "TIER2_FAILED=true" >> $GITHUB_ENV
+          pytest tests/test_evaluation_suite.py::TestBankersRounding -v --tb=short \
+            || echo "TIER2_FAILED=true" >> $GITHUB_ENV
+          pytest tests/test_evaluation_suite.py::TestTypeMismatch -v --tb=short \
+            || echo "TIER2_FAILED=true" >> $GITHUB_ENV
+          pytest tests/test_evaluation_suite.py::TestEventualConsistency -v --tb=short \
+            || echo "TIER2_FAILED=true" >> $GITHUB_ENV
+        continue-on-error: true
+        timeout-minutes: 10
+
+      - name: Run evaluation suite (TIER 3: Resilience)
+        id: tier3
+        run: |
+          pytest tests/test_evaluation_suite.py::TestBareExceptions -v --tb=short \
+            || echo "TIER3_FAILED=true" >> $GITHUB_ENV
+          pytest tests/test_evaluation_suite.py::TestRateLimitDetection -v --tb=short \
+            || echo "TIER3_FAILED=true" >> $GITHUB_ENV
+          pytest tests/test_evaluation_suite.py::TestTimeoutHandling -v --tb=short \
+            || echo "TIER3_FAILED=true" >> $GITHUB_ENV
+          pytest tests/test_evaluation_suite.py::TestErrorMasking -v --tb=short \
+            || echo "TIER3_FAILED=true" >> $GITHUB_ENV
+        continue-on-error: true
+        timeout-minutes: 10
+
+      - name: Run evaluation suite (TIER 4: Validation)
+        id: tier4
+        run: |
+          pytest tests/test_evaluation_suite.py::TestDataValidation -v --tb=short \
+            || echo "TIER4_FAILED=true" >> $GITHUB_ENV
+        continue-on-error: true
+        timeout-minutes: 5
+
+      - name: Generate coverage report
+        run: |
+          pytest tests/ --cov=app --cov-report=xml --cov-report=html --cov-report=term-missing -q
+        continue-on-error: true
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./coverage.xml
+          fail_ci_if_error: false
+          verbose: true
+        continue-on-error: true
+
+      - name: Create test summary
+        if: always()
+        run: |
+          echo "# Test Results Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ env.TIER1_FAILED }}" = "true" ]; then
+            echo "## TIER 1 (Security) - FAILED ❌" >> $GITHUB_STEP_SUMMARY
+            echo "Critical security vulnerabilities detected. Fix before merge." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "## TIER 1 (Security) - PASSED ✓" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          if [ "${{ env.TIER2_FAILED }}" = "true" ]; then
+            echo "## TIER 2 (Data Integrity) - FAILED ❌" >> $GITHUB_STEP_SUMMARY
+            echo "Data integrity issues detected." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "## TIER 2 (Data Integrity) - PASSED ✓" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          if [ "${{ env.TIER3_FAILED }}" = "true" ]; then
+            echo "## TIER 3 (Resilience) - FAILED ⚠️" >> $GITHUB_STEP_SUMMARY
+            echo "Resilience and error handling issues detected." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "## TIER 3 (Resilience) - PASSED ✓" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          if [ "${{ env.TIER4_FAILED }}" = "true" ]; then
+            echo "## TIER 4 (Validation) - FAILED ⚠️" >> $GITHUB_STEP_SUMMARY
+            echo "Input validation issues detected." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "## TIER 4 (Validation) - PASSED ✓" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Fail if TIER 1 (Security) tests failed
+        if: env.TIER1_FAILED == 'true'
+        run: exit 1
+
+      - name: Comment PR with test results
+        if: github.event_name == 'pull_request' && always()
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const tier1 = process.env.TIER1_FAILED ? '❌ FAILED' : '✓ PASSED';
+            const tier2 = process.env.TIER2_FAILED ? '❌ FAILED' : '✓ PASSED';
+            const tier3 = process.env.TIER3_FAILED ? '⚠️ FAILED' : '✓ PASSED';
+            const tier4 = process.env.TIER4_FAILED ? '⚠️ FAILED' : '✓ PASSED';
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `## Test Results\n- TIER 1 (Security): ${tier1}\n- TIER 2 (Data Integrity): ${tier2}\n- TIER 3 (Resilience): ${tier3}\n- TIER 4 (Validation): ${tier4}`
+            });

@@ -63,3 +63,15 @@ variable "max_capacity" {
   type        = number
   default     = 3
 }
+
+variable "vpc_id" {
+  description = "VPC ID (optional - if not provided, uses default VPC)"
+  type        = string
+  default     = ""
+}
+
+variable "subnet_ids" {
+  description = "Subnet IDs for ECS tasks (optional - if not provided, uses default subnets)"
+  type        = list(string)
+  default     = []
+}

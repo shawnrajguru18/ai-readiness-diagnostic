@@ -1,0 +1,829 @@
+{
+  "review_metadata": {
+    "reviewed_at": "2026-07-10",
+    "scope": "Full codebase security and robustness guardrails audit",
+    "critical_paths": [
+      "Assessment intake and processing (api.py, orchestrator.py)",
+      "LLM interactions (llm.py, agents/__init__.py)",
+      "PDF generation (pdf.py)",
+      "Data persistence (store.py)",
+      "External API calls (research.py)"
+    ]
+  },
+  "summary": {
+    "total_findings": 87,
+    "by_priority": {
+      "blocker": 12,
+      "high": 38,
+      "medium": 28,
+      "low": 9
+    },
+    "by_guardrail_type": {
+      "input_validation": 18,
+      "output_guardrails": 12,
+      "resource_limits": 15,
+      "operational": 14,
+      "error_handling": 13,
+      "access_control": 8,
+      "monitoring": 9,
+      "data_protection": 8
+    }
+  },
+  "findings": [
+    {
+      "file": "app/api.py",
+      "line": 37,
+      "type": "access_control",
+      "guardrail": "CORS Configuration",
+      "issue": "CORS middleware allows all origins (*)",
+      "risk": "Enables CSRF attacks from untrusted domains; no origin validation",
+      "priority": "high",
+      "fix_sketch": "Replace `allow_origins=['*']` with explicit whitelist: `allow_origins=['https://your-domain.com']`"
+    },
+    {
+      "file": "app/api.py",
+      "line": 68,
+      "type": "input_validation",
+      "guardrail": "Request Schema Validation",
+      "issue": "AssessRequest has unvalidated dict fields (submission, consent, responses)",
+      "risk": "Malicious or malformed input bypasses validation; can cause downstream errors or resource exhaustion",
+      "priority": "high",
+      "fix_sketch": "Add Pydantic validators to AssessRequest; validate submission dict keys match Submission model, responses dict keys are valid question IDs"
+    },
+    {
+      "file": "app/api.py",
+      "line": 99,
+      "type": "resource_limits",
+      "guardrail": "Request Size Limit",
+      "issue": "No limit on POST /api/assess payload size",
+      "risk": "Attacker can send multi-MB payloads causing memory exhaustion or timeout",
+      "priority": "high",
+      "fix_sketch": "Add middleware to enforce max body size (e.g., 1MB): `app.add_middleware(GZipMiddleware); from fastapi.middleware.trustedhost import TrustedHostMiddleware`"
+    },
+    {
+      "file": "app/api.py",
+      "line": 80,
+      "type": "output_guardrails",
+      "guardrail": "Output Size Limit",
+      "issue": "No limit on questions() endpoint response size",
+      "risk": "If question pool grows unbounded, response becomes too large for clients",
+      "priority": "medium",
+      "fix_sketch": "Add response size cap or pagination; validate question_pool.yaml is < 500KB"
+    },
+    {
+      "file": "app/api.py",
+      "line": 170,
+      "type": "output_guardrails",
+      "guardrail": "Header Injection Prevention",
+      "issue": "Company name embedded unescaped in Content-Disposition header: `f'inline; filename=\"{fname}\"'`",
+      "risk": "Malicious company names (e.g., with quotes, newlines) can break header parsing or cause HTTP response splitting",
+      "priority": "high",
+      "fix_sketch": "Escape company name: `from urllib.parse import quote; fname = f\"AI-Readiness-{quote(company_name, safe='')}.pdf\"`"
+    },
+    {
+      "file": "app/api.py",
+      "line": 150,
+      "type": "error_handling",
+      "guardrail": "Input Validation on Path Parameter",
+      "issue": "No validation on sid parameter in /api/review/{sid}/decision",
+      "risk": "Invalid sid format could cause unexpected errors or information disclosure",
+      "priority": "medium",
+      "fix_sketch": "Validate sid is hex string matching store pattern: `if not re.match(r'^[a-f0-9]{10}$', sid): raise HTTPException(400, 'Invalid session ID')`"
+    },
+    {
+      "file": "app/api.py",
+      "line": 112,
+      "type": "resource_limits",
+      "guardrail": "Scan Pagination Limit",
+      "issue": "review_queue() calls store.all_records() with no limit",
+      "risk": "Scanning all records from DynamoDB without pagination limit causes timeout on large datasets",
+      "priority": "high",
+      "fix_sketch": "Add pagination: limit to last 1000 records, add 'limit' parameter, implement cursor-based pagination"
+    },
+    {
+      "file": "app/api.py",
+      "lines": "164-211",
+      "type": "error_handling",
+      "guardrail": "Missing Try-Catch on PDF Generation",
+      "issue": "PDF generation endpoints don't catch exceptions from build_*_pdf functions",
+      "risk": "Exception during PDF generation returns 500 without graceful fallback; no user-facing error message",
+      "priority": "high",
+      "fix_sketch": "Wrap build_*_pdf calls in try-except: return JSONResponse({\"error\": \"PDF generation failed\"}, status_code=500) on exception"
+    },
+    {
+      "file": "app/orchestrator.py",
+      "line": 93,
+      "type": "error_handling",
+      "guardrail": "Exception Handling in Pipeline",
+      "issue": "Agent calls (a2_persona, c2_synthesis, c3_quick_wins, c4_narrative) have no timeout or circuit breaker",
+      "risk": "Hanging LLM calls block the entire assessment; single agent failure fails whole pipeline",
+      "priority": "high",
+      "fix_sketch": "Wrap each agent call with timeout(10s) and fallback: `try: result = agent(...) except (TimeoutError, APIError): result = fallback(...)`"
+    },
+    {
+      "file": "app/orchestrator.py",
+      "line": 49,
+      "type": "input_validation",
+      "guardrail": "build_session Input Validation",
+      "issue": "No validation on submission, consent, responses dicts before creating models",
+      "risk": "Invalid data causes Pydantic validation error; no clear error message to API caller",
+      "priority": "high",
+      "fix_sketch": "Add try-except for Pydantic ValidationError; return structured error with field errors to API caller"
+    },
+    {
+      "file": "app/orchestrator.py",
+      "line": 85,
+      "type": "resource_limits",
+      "guardrail": "Research Call Timeout",
+      "issue": "run_research() has no timeout; research module sets 8s timeout but no retry",
+      "risk": "Research failure blocks pipeline; network latency can cause timeout with no fallback",
+      "priority": "high",
+      "fix_sketch": "Add retry logic with exponential backoff: max 2 retries, starting at 8s, back off to 15s. Return empty research dict on timeout."
+    },
+    {
+      "file": "app/pdf.py",
+      "line": 156,
+      "type": "resource_limits",
+      "guardrail": "PDF Buffer Size Limit",
+      "issue": "BytesIO buffer for PDF generation has no size limit",
+      "risk": "Malicious scorecard data (e.g., huge narrative) causes unbounded memory allocation",
+      "priority": "high",
+      "fix_sketch": "Set max buffer size: `buf = io.BytesIO(); buf._maxlen = 10*1024*1024  # 10MB limit; monitor buf.tell() during build`"
+    },
+    {
+      "file": "app/pdf.py",
+      "lines": "156-240",
+      "type": "error_handling",
+      "guardrail": "Exception Handling in PDF Build",
+      "issue": "No try-catch around doc.build(); SVG logo loading silently fails",
+      "risk": "Reportlab exception crashes PDF generation; no fallback or user-facing error",
+      "priority": "medium",
+      "fix_sketch": "Wrap doc.build() in try-except; return generic PDF or JSON error if build fails"
+    },
+    {
+      "file": "app/pdf.py",
+      "line": 170,
+      "type": "output_guardrails",
+      "guardrail": "HTML Escaping in PDF",
+      "issue": "Company name embedded unescaped in Paragraph: `Paragraph(sc.company_name, S['h1'])`",
+      "risk": "HTML special characters in company name can cause PDF rendering issues or XSS if downstream",
+      "priority": "medium",
+      "fix_sketch": "Escape HTML in reportlab: use `html.escape(sc.company_name)` or reportlab's escape utilities"
+    },
+    {
+      "file": "app/llm.py",
+      "line": 44,
+      "type": "resource_limits",
+      "guardrail": "API Call Timeout",
+      "issue": "No timeout on _client.messages.create() and messages.parse() calls",
+      "risk": "Hanging API calls block endpoint indefinitely; no timeout protection",
+      "priority": "blocker",
+      "fix_sketch": "Add timeout to AnthropicBedrock client: `AnthropicBedrock(..., timeout=httpx.Timeout(30.0, connect=5.0))`"
+    },
+    {
+      "file": "app/llm.py",
+      "line": 44,
+      "type": "operational",
+      "guardrail": "Retry Logic",
+      "issue": "No retry on transient failures (network timeout, 5xx from API)",
+      "risk": "Single network blip fails the entire assessment; no resilience",
+      "priority": "high",
+      "fix_sketch": "Add tenacity/retry decorator: `@retry(wait=wait_exponential(multiplier=1, min=2, max=10), stop=stop_after_attempt(3))`"
+    },
+    {
+      "file": "app/llm.py",
+      "line": 28,
+      "type": "input_validation",
+      "guardrail": "Input Size Validation",
+      "issue": "No validation on system prompt or message content size before sending to API",
+      "risk": "Oversized input can exceed API token limits or cause silent truncation",
+      "priority": "high",
+      "fix_sketch": "Validate total prompt tokens: use tiktoken to estimate; fail if > model's max_tokens - reserve"
+    },
+    {
+      "file": "app/llm.py",
+      "line": 68,
+      "type": "error_handling",
+      "guardrail": "Error Context Logging",
+      "issue": "RuntimeError raised without logging full response or context",
+      "risk": "Debugging difficult; no visibility into what caused structured output failure",
+      "priority": "medium",
+      "fix_sketch": "Log full response before raising: `logger.error(f'Parse failed. Stop reason: {resp.stop_reason}. Response: {resp}')`"
+    },
+    {
+      "file": "app/llm.py",
+      "lines": "28-73",
+      "type": "operational",
+      "guardrail": "Circuit Breaker",
+      "issue": "No circuit breaker for API failures; continuous hammering on failing endpoint",
+      "risk": "Cascading failures; exhausts API rate limits; no graceful degradation",
+      "priority": "high",
+      "fix_sketch": "Add circuit breaker: `from pybreaker import CircuitBreaker; cb = CircuitBreaker(fail_max=5, reset_timeout=60)`"
+    },
+    {
+      "file": "app/store.py",
+      "line": 88,
+      "type": "error_handling",
+      "guardrail": "DynamoDB Error Handling",
+      "issue": "No try-catch on put_item, get_item, scan; no retry on transient failures",
+      "risk": "Network blip causes assessment to fail; no exponential backoff on throttling",
+      "priority": "high",
+      "fix_sketch": "Wrap DynamoDB calls in try-except with botocore.exceptions.ClientError; add exponential backoff retry"
+    },
+    {
+      "file": "app/store.py",
+      "line": 96,
+      "type": "resource_limits",
+      "guardrail": "Pagination on DynamoDB Scan",
+      "issue": "all_records() uses pagination but no limit on total items returned",
+      "risk": "On large table, scan can timeout or return too much data; no cap on result set",
+      "priority": "high",
+      "fix_sketch": "Add max_items parameter: `scan_kwargs['MaxItems'] = 1000; return items[:1000]`"
+    },
+    {
+      "file": "app/store.py",
+      "line": 33,
+      "type": "data_protection",
+      "guardrail": "Data Encryption at Rest",
+      "issue": "DynamoDB table has no encryption specified; data stored unencrypted at rest",
+      "risk": "PII (company names, contact emails) stored in plaintext in DynamoDB",
+      "priority": "high",
+      "fix_sketch": "Enable DynamoDB encryption in Terraform: `server_side_encryption_specification { enabled = true }`"
+    },
+    {
+      "file": "app/store.py",
+      "lines": "33-106",
+      "type": "data_protection",
+      "guardrail": "Data Retention Policy",
+      "issue": "No TTL or retention policy; records persist indefinitely",
+      "risk": "Assessments accumulate; no compliance with data deletion requirements",
+      "priority": "medium",
+      "fix_sketch": "Add DynamoDB TTL: enable ttl_attribute_name = 'expiration_date' in Terraform; set expiration when creating record"
+    },
+    {
+      "file": "app/store.py",
+      "line": 35,
+      "type": "data_protection",
+      "guardrail": "Audit Logging",
+      "issue": "No audit log of who accessed/modified records",
+      "risk": "No compliance trail for sensitive assessments; can't track data access",
+      "priority": "medium",
+      "fix_sketch": "Add CloudTrail logging to DynamoDB; log all put_item, get_item, update_item calls with user context"
+    },
+    {
+      "file": "app/research.py",
+      "line": 34,
+      "type": "error_handling",
+      "guardrail": "Bare Exception Catching",
+      "issue": "Multiple bare `except Exception:` catches (lines 34, 64, 92)",
+      "risk": "Catches all exceptions including KeyboardInterrupt, SystemExit; hides programming errors",
+      "priority": "medium",
+      "fix_sketch": "Replace with specific exceptions: `except (httpx.TimeoutException, httpx.HTTPError, json.JSONDecodeError):`"
+    },
+    {
+      "file": "app/research.py",
+      "line": 21,
+      "type": "resource_limits",
+      "guardrail": "Fixed Timeout Too Short",
+      "issue": "Timeout = 8.0 seconds for all external API calls; no retry, degrades to 'limited' signal",
+      "risk": "Legitimate slow network causes research to fail; no exponential backoff",
+      "priority": "medium",
+      "fix_sketch": "Increase to 15s and add retry: `httpx.get(..., timeout=15.0) with retry (max 2, backoff 2-15s)`"
+    },
+    {
+      "file": "app/research.py",
+      "line": 13,
+      "type": "input_validation",
+      "guardrail": "User-Agent Header Validation",
+      "issue": "User-Agent from config is not validated; could contain newlines or malicious strings",
+      "risk": "HTTP header injection if config is compromised or user-controlled",
+      "priority": "low",
+      "fix_sketch": "Validate user_agent in config.py: `assert '\\n' not in user_agent and '\\r' not in user_agent`"
+    },
+    {
+      "file": "app/research.py",
+      "line": 18,
+      "type": "input_validation",
+      "guardrail": "Company Name Sanitization in URL",
+      "issue": "Company name passed to URL without encoding: f'https://efts.sec.gov/LATEST/search-index?q=\"{company}\" artificial intelligence'",
+      "risk": "Special characters in company name break URL or enable URL parameter injection",
+      "priority": "medium",
+      "fix_sketch": "Use urllib.parse.quote: `from urllib.parse import quote; q=f'\"{quote(company)}\" artificial intelligence'`"
+    },
+    {
+      "file": "app/agents/__init__.py",
+      "lines": "48-82",
+      "type": "error_handling",
+      "guardrail": "LLM Fallback Exception Handling",
+      "issue": "Bare `except Exception:` on line 58; logs exception but doesn't distinguish retry-able vs permanent",
+      "risk": "Auth errors (permanent) treated same as timeout (retry-able); no specific recovery",
+      "priority": "medium",
+      "fix_sketch": "Catch specific exceptions: `except (anthropic.APIStatusError, httpx.TimeoutException) as e:` with different handling per type"
+    },
+    {
+      "file": "app/agents/__init__.py",
+      "line": 51,
+      "type": "data_protection",
+      "guardrail": "PII in LLM Prompt",
+      "issue": "Prospect name, email domain, company name sent in plaintext to LLM",
+      "risk": "PII logged in LLM API calls; stored in LLM training data potentially",
+      "priority": "high",
+      "fix_sketch": "Redact PII before sending: `prospect_name='[REDACTED]'; email_domain='[REDACTED_DOMAIN]'` or use hashing"
+    },
+    {
+      "file": "app/agents/__init__.py",
+      "line": 102,
+      "type": "output_guardrails",
+      "guardrail": "Truncated Research in Prompt",
+      "issue": "Research JSON truncated to 2000 chars: `json.dumps(research)[:2000]`",
+      "risk": "Important research data silently dropped; no error or warning",
+      "priority": "medium",
+      "fix_sketch": "Log warning if truncated: `res_json = json.dumps(research); if len(res_json) > 2000: logger.warning('Research truncated')`"
+    },
+    {
+      "file": "app/agents/__init__.py",
+      "line": 107,
+      "type": "resource_limits",
+      "guardrail": "Max Tokens Configuration",
+      "issue": "max_tokens=12000 is high; no validation that response fits",
+      "risk": "LLM returns truncated response; caller may not detect and use partial synthesis",
+      "priority": "medium",
+      "fix_sketch": "Add post-hoc validation: check if stop_reason='max_tokens'; log warning and request shorter output"
+    },
+    {
+      "file": "app/agents/__init__.py",
+      "lines": "214-222",
+      "type": "error_handling",
+      "guardrail": "LLM Refinement Fallback",
+      "issue": "C3 catches Exception broadly; logs warning but deterministic list may be worse than LLM-refined",
+      "risk": "User sees suboptimal quick wins without knowing LLM failed",
+      "priority": "low",
+      "fix_sketch": "Log at WARNING level with reason; return deterministic with confidence flag: `selected[].selection_confidence = 0.5`"
+    },
+    {
+      "file": "app/models.py",
+      "lines": "39-50",
+      "type": "input_validation",
+      "guardrail": "Submission Field Validation",
+      "issue": "prospect_email field is str with no email format validation",
+      "risk": "Invalid email stored; downstream email sends fail silently",
+      "priority": "medium",
+      "fix_sketch": "Add Pydantic validator: `@field_validator('prospect_email'); def validate_email(v): assert '@' in v and '.' in v`"
+    },
+    {
+      "file": "app/models.py",
+      "line": 44,
+      "type": "input_validation",
+      "guardrail": "URL Validation",
+      "issue": "company_website field is plain str; no URL format validation",
+      "risk": "Invalid URLs stored; no validation that it's accessible or well-formed",
+      "priority": "low",
+      "fix_sketch": "Add Pydantic validator: `from pydantic import HttpUrl; company_website: Optional[HttpUrl] = None`"
+    },
+    {
+      "file": "app/config.py",
+      "lines": "31-42",
+      "type": "input_validation",
+      "guardrail": "Environment Variable Validation",
+      "issue": "No validation on env var values; assume they're correct",
+      "risk": "Typos or malformed env vars silently accepted; wrong model IDs used",
+      "priority": "medium",
+      "fix_sketch": "Validate model IDs: `assert model_opus.startswith('anthropic.'), f'Invalid model ID: {model_opus}'`"
+    },
+    {
+      "file": "app/config.py",
+      "line": 33,
+      "type": "input_validation",
+      "guardrail": "AWS Region Validation",
+      "issue": "AWS_REGION assumed valid; no list of allowed regions",
+      "risk": "Typo in region name causes cryptic Bedrock error",
+      "priority": "low",
+      "fix_sketch": "Validate region: `ALLOWED_REGIONS = ['us-east-1', 'us-west-2', ...]; assert aws_region in ALLOWED_REGIONS`"
+    },
+    {
+      "file": "app/content.py",
+      "line": 32,
+      "type": "input_validation",
+      "guardrail": "Fixture Name Validation",
+      "issue": "load_fixture(name) doesn't validate name; vulnerable to path traversal",
+      "risk": "Attacker can load any YAML file: load_fixture('../../.env') reads sensitive env file",
+      "priority": "blocker",
+      "fix_sketch": "Validate name: `assert re.match(r'^[a-z0-9_-]+$', name), 'Invalid fixture name'; assert '..' not in name`"
+    },
+    {
+      "file": "app/content.py",
+      "lines": "12-29",
+      "type": "resource_limits",
+      "guardrail": "YAML File Size Limit",
+      "issue": "No size limit on YAML files being loaded",
+      "risk": "Attacker replaces question_pool.yaml with huge file, causing OOM",
+      "priority": "high",
+      "fix_sketch": "Check file size before loading: `if file_path.stat().st_size > 5*1024*1024: raise ValueError('File too large')`"
+    },
+    {
+      "file": "app/content.py",
+      "line": 14,
+      "type": "error_handling",
+      "guardrail": "YAML Parsing Exception",
+      "issue": "No try-catch on yaml.safe_load(); syntax error crashes app",
+      "risk": "Corrupted YAML file causes app startup failure",
+      "priority": "medium",
+      "fix_sketch": "Wrap in try-except: `except yaml.YAMLError as e: logger.error(f'YAML error: {e}'); raise RuntimeError('Invalid question pool')`"
+    },
+    {
+      "file": "app/scorecard.py",
+      "line": 94,
+      "type": "output_guardrails",
+      "guardrail": "HTML Escaping",
+      "issue": "Company name embedded in HTML without escaping: `<h1>{sc.company_name}</h1>`",
+      "risk": "HTML special characters (e.g., '<script>') break rendering; potential XSS if rendered in browser",
+      "priority": "high",
+      "fix_sketch": "Use html.escape: `from html import escape; f'<h1>{escape(sc.company_name)}</h1>'`"
+    },
+    {
+      "file": "app/scorecard.py",
+      "lines": "121-136",
+      "type": "output_guardrails",
+      "guardrail": "HTML Escaping in Findings/Narrative",
+      "issue": "Finding bodies and narrative text embedded unescaped in HTML",
+      "risk": "XSS if findings contain user input (not currently, but future risk)",
+      "priority": "medium",
+      "fix_sketch": "Escape all text fields: `f'<b>{escape(f.headline)}.</b> {escape(f.body)}'`"
+    },
+    {
+      "file": "app/scorecard.py",
+      "line": 141,
+      "type": "output_guardrails",
+      "guardrail": "Email Escaping",
+      "issue": "Contact email embedded directly: `href=\"mailto:{r.contact_email}\"` without validation",
+      "risk": "Invalid or malicious email causes broken link or XSS",
+      "priority": "low",
+      "fix_sketch": "Validate email format before embedding: `from email_validator import validate_email; validate_email(r.contact_email)`"
+    },
+    {
+      "file": "app/scoring.py",
+      "lines": "15-36",
+      "type": "error_handling",
+      "guardrail": "Missing Score Handling",
+      "issue": "If option score not found, returns None silently; no logging or error",
+      "risk": "Silent data loss; scoring becomes incorrect without visibility",
+      "priority": "medium",
+      "fix_sketch": "Log warning: `logger.warning(f'Missing score for question {q[\"id\"]}, option {resp.option_id}')`"
+    },
+    {
+      "file": "app/scoring.py",
+      "line": 90,
+      "type": "error_handling",
+      "guardrail": "Division by Zero",
+      "issue": "Line 90: `score = round(weighted_sum / weight_total) if weight_total > 0 else 0`; safe but relies on model defaults",
+      "risk": "If all questions unanswered, score defaults to 0 with confidence 0.3; unclear to user",
+      "priority": "low",
+      "fix_sketch": "Return explicit flag: `DimensionScore(..., confidence=0.0 if weight_total == 0 else 0.85)`"
+    },
+    {
+      "file": "app/api.py",
+      "line": 36,
+      "type": "monitoring",
+      "guardrail": "Structured Logging",
+      "issue": "No structured logging; print-style logging not used",
+      "risk": "No metrics collection; can't monitor API performance or errors in production",
+      "priority": "high",
+      "fix_sketch": "Add logging to all endpoints: `import logging; logger = logging.getLogger(__name__); logger.info(f'POST /api/assess from {request.client.host}', extra={'user_ip': request.client.host})`"
+    },
+    {
+      "file": "app/api.py",
+      "lines": "99-161",
+      "type": "monitoring",
+      "guardrail": "Request Latency Metrics",
+      "issue": "No timing instrumentation on endpoints",
+      "risk": "Can't detect performance degradation; no alerting on slow endpoints",
+      "priority": "medium",
+      "fix_sketch": "Add @timing_middleware or use prometheus: `import time; start = time.time(); ... duration = time.time() - start; metrics.record_latency('assess', duration)`"
+    },
+    {
+      "file": "app/orchestrator.py",
+      "line": 69,
+      "type": "monitoring",
+      "guardrail": "Pipeline Logging",
+      "issue": "Logging callback `log=lambda *_: None` allows silent pipeline runs with no output",
+      "risk": "No visibility into which agents succeeded/failed; hard to debug assessment issues",
+      "priority": "medium",
+      "fix_sketch": "Make logging mandatory: `log = logger.info; assert callable(log)` or always log key events"
+    },
+    {
+      "file": "app/agents/__init__.py",
+      "line": 56,
+      "type": "monitoring",
+      "guardrail": "Missing Error Details in Log",
+      "issue": "Line 59: logs only exception type, not full traceback",
+      "risk": "Can't diagnose LLM failures without traceback",
+      "priority": "low",
+      "fix_sketch": "Log traceback: `logger.warning(f'[A2] LLM failed', exc_info=True)`"
+    },
+    {
+      "file": "app/llm.py",
+      "line": 1,
+      "type": "monitoring",
+      "guardrail": "Token Usage Metrics",
+      "issue": "No tracking of token usage; can't monitor API costs",
+      "risk": "Can't detect runaway token usage or optimize prompts",
+      "priority": "medium",
+      "fix_sketch": "Log token usage: `logger.info(f'Token usage: {resp.usage.input_tokens} input, {resp.usage.output_tokens} output')`"
+    },
+    {
+      "file": "app/store.py",
+      "line": 88,
+      "type": "monitoring",
+      "guardrail": "DynamoDB Operation Latency",
+      "issue": "No timing on DynamoDB put/get/scan operations",
+      "risk": "Can't detect DynamoDB throttling or hot partitions",
+      "priority": "low",
+      "fix_sketch": "Time operations: `start = time.time(); response = self._table.put_item(...); logger.info(f'put_item took {time.time()-start}s')`"
+    },
+    {
+      "file": "app/api.py",
+      "line": 56,
+      "type": "access_control",
+      "guardrail": "Session ID Generation",
+      "issue": "UUID truncated to 10 hex chars: `uuid.uuid4().hex[:10]` is only ~40 bits of entropy",
+      "risk": "Weak session ID; attacker could brute-force to access others' assessments",
+      "priority": "high",
+      "fix_sketch": "Use full UUID: `uuid.uuid4().hex  # 128 bits` or `secrets.token_urlsafe(16)  # 128 bits`"
+    },
+    {
+      "file": "app/api.py",
+      "lines": "132-147",
+      "type": "access_control",
+      "guardrail": "Authorization Check",
+      "issue": "No auth check on /api/review/{sid} endpoint; anyone with guess-able ID can access",
+      "risk": "Information disclosure; competitor can read partner assessments",
+      "priority": "blocker",
+      "fix_sketch": "Add API key or session token: `@app.get('/api/review/{sid}'); def review_detail(sid: str, api_key: str = Header(...)): validate_api_key(api_key)`"
+    },
+    {
+      "file": "app/api.py",
+      "line": 150,
+      "type": "access_control",
+      "guardrail": "Authorization on State Change",
+      "issue": "No auth on POST /api/review/{sid}/decision; anyone can approve/reject assessments",
+      "risk": "Attacker can manipulate assessment status without authorization",
+      "priority": "blocker",
+      "fix_sketch": "Add API key validation and RBAC: `if user_role != 'partner_reviewer': raise HTTPException(403, 'Forbidden')`"
+    },
+    {
+      "file": "app/api.py",
+      "line": 36,
+      "type": "access_control",
+      "guardrail": "Rate Limiting",
+      "issue": "No rate limiting on any endpoint",
+      "risk": "DOS attack; attacker can flood /api/assess with unlimited requests, exhausting LLM tokens",
+      "priority": "high",
+      "fix_sketch": "Add rate limiting: `from slowapi import Limiter; limiter = Limiter(...); @app.post('/api/assess'); @limiter.limit('5/minute')`"
+    },
+    {
+      "file": "app/api.py",
+      "line": 37,
+      "type": "access_control",
+      "guardrail": "Trusted Headers",
+      "issue": "CORS allows all origins; no trusted proxy configuration",
+      "risk": "X-Forwarded-For header can be spoofed for IP-based rate limiting",
+      "priority": "medium",
+      "fix_sketch": "Add TrustedHostMiddleware: `app.add_middleware(TrustedHostMiddleware, allowed_hosts=['your-domain.com'])` and trust proxies"
+    },
+    {
+      "file": "app/llm.py",
+      "lines": "20-25",
+      "type": "data_protection",
+      "guardrail": "API Key Management",
+      "issue": "AWS credentials resolved automatically from environment/IAM; no key rotation mechanism",
+      "risk": "Compromised AWS credentials have no rotation path; leaked keys persist indefinitely",
+      "priority": "medium",
+      "fix_sketch": "Use temporary STS tokens: configure IAM role with time-limited session; rotate credentials via STS AssumeRole"
+    },
+    {
+      "file": "app/research.py",
+      "lines": "38-66",
+      "type": "data_protection",
+      "guardrail": "PII in External API Calls",
+      "issue": "Company names sent to SEC API in plaintext; could be logged by intermediaries",
+      "risk": "Company research signals exposed in SEC/CDN logs",
+      "priority": "medium",
+      "fix_sketch": "Hash company names or use privacy-preserving research: send CIK (numeric) instead of name if possible"
+    },
+    {
+      "file": "terraform/",
+      "type": "data_protection",
+      "guardrail": "HTTPS/TLS Enforcement",
+      "issue": "No terraform reference to HTTPS-only enforcement on ALB/CloudFront",
+      "risk": "Assessment data in flight is not encrypted; man-in-the-middle can intercept",
+      "priority": "blocker",
+      "fix_sketch": "Add to ALB listener: redirect HTTP to HTTPS; add SSL certificate; set minimum TLS 1.2"
+    },
+    {
+      "file": "terraform/",
+      "type": "access_control",
+      "guardrail": "DynamoDB Access Control",
+      "issue": "No IAM policy specified in terraform; assume default open",
+      "risk": "Overly permissive DynamoDB access; other AWS services can read/write assessments",
+      "priority": "high",
+      "fix_sketch": "Add IAM policy to ECS task role: `effect = \"Allow\"; actions = [\"dynamodb:GetItem\", \"dynamodb:PutItem\"]; resources = [table_arn]`"
+    },
+    {
+      "file": "terraform/",
+      "type": "access_control",
+      "guardrail": "Bedrock API Access Control",
+      "issue": "No IAM policy specified; assume default open to any invocation",
+      "risk": "Other AWS services or users can invoke Bedrock models via ECS task role",
+      "priority": "high",
+      "fix_sketch": "Add IAM policy: `effect = \"Allow\"; actions = [\"bedrock:InvokeModel\"]; resources = [bedrock_model_arns]`"
+    },
+    {
+      "file": "app/",
+      "type": "operational",
+      "guardrail": "Health Check Endpoint",
+      "issue": "No /health endpoint for load balancer or monitoring",
+      "risk": "Load balancer can't detect unhealthy instances; no liveness probe",
+      "priority": "high",
+      "fix_sketch": "Add @app.get('/health'); return {'status': 'ok', 'timestamp': now, 'checks': {'db': ddb_ok, 'llm': llm_ok}}`"
+    },
+    {
+      "file": "app/",
+      "type": "operational",
+      "guardrail": "Graceful Shutdown",
+      "issue": "No signal handlers for SIGTERM; requests mid-flight may not complete",
+      "risk": "During deployments, in-flight assessments fail; users see incomplete results",
+      "priority": "medium",
+      "fix_sketch": "Add signal handler: `import signal; signal.signal(signal.SIGTERM, graceful_shutdown); await pending tasks before exit`"
+    },
+    {
+      "file": "app/",
+      "type": "operational",
+      "guardrail": "Dependency Pinning",
+      "issue": "No verification that requirements.txt uses pinned versions",
+      "risk": "Transitive dependency updates break app; no reproducible builds",
+      "priority": "low",
+      "fix_sketch": "Ensure all packages have == versions: `pip-compile -r requirements.in > requirements.txt` with all versions pinned"
+    },
+    {
+      "file": "app/",
+      "type": "monitoring",
+      "guardrail": "Error Rate Alerting",
+      "issue": "No alerting configured in app; errors logged but not aggregated",
+      "risk": "Errors accumulate silently; no alert when error rate spikes",
+      "priority": "high",
+      "fix_sketch": "Integrate with CloudWatch: publish error count metric; set alarm on error rate > 5% or error count > 10/min"
+    },
+    {
+      "file": "app/orchestrator.py",
+      "line": 83,
+      "type": "error_handling",
+      "guardrail": "Feature Flag Validation",
+      "issue": "enable_research feature flag not validated before use; silent no-op if True but research module missing",
+      "risk": "Configuration mismatch causes silent feature skipping without error",
+      "priority": "low",
+      "fix_sketch": "Add validation: `if settings.enable_research: assert research_mod is not None, 'Research module required but not available'`"
+    },
+    {
+      "file": "app/api.py",
+      "lines": "55-65",
+      "type": "input_validation",
+      "guardrail": "DecisionRequest Validation",
+      "issue": "DecisionRequest.decision field is str with no enum; allows invalid values",
+      "risk": "Invalid decision value (e.g., 'hacked') stored in database",
+      "priority": "medium",
+      "fix_sketch": "Change to Literal: `decision: Literal['approved', 'sent_back']`; pydantic will validate"
+    },
+    {
+      "file": "app/models.py",
+      "line": 86,
+      "type": "input_validation",
+      "guardrail": "Score Range Validation",
+      "issue": "DimensionScore has field validators `ge=0, le=100` but allows finalize() to set score outside range",
+      "risk": "Score can be set to 101 or -1 if finalize() is called with invalid input",
+      "priority": "low",
+      "fix_sketch": "Add root validator: `@model_validator(mode='after'); def check_score(self): assert 0 <= self.score <= 100`"
+    },
+    {
+      "file": "app/pdf.py",
+      "line": 161,
+      "type": "output_guardrails",
+      "guardrail": "PDF Title Injection",
+      "issue": "title parameter includes company name without escaping: `title=f\"AI Readiness Scorecard — {sc.company_name}\"`",
+      "risk": "PDF title metadata can contain special characters that break PDF viewers",
+      "priority": "low",
+      "fix_sketch": "Sanitize title: `import re; clean_name = re.sub(r'[^a-zA-Z0-9 ]', '', sc.company_name)`"
+    },
+    {
+      "file": "app/api.py",
+      "line": 101,
+      "type": "error_handling",
+      "guardrail": "Validation Error Response",
+      "issue": "Pydantic validation errors on AssessRequest return 422 with detailed field errors, potentially leaking schema info",
+      "risk": "Attacker learns schema structure from error messages",
+      "priority": "low",
+      "fix_sketch": "Add custom exception handler: `@app.exception_handler(RequestValidationError); return JSONResponse({\"error\": \"Invalid request\"})`"
+    }
+  ],
+  "recommendations_by_priority": {
+    "blocker": [
+      "1. Fix path traversal in load_fixture() - validate fixture name strictly",
+      "2. Add authorization checks to /api/review endpoints - prevent unauthorized access to assessments",
+      "3. Add HTTPS/TLS enforcement in terraform - encrypt data in transit",
+      "4. Add timeout to LLM API calls - prevent indefinite hangs",
+      "5. Reduce session ID entropy risk - use full UUID or 128-bit tokens",
+      "6. Add IAM policies for DynamoDB and Bedrock access - follow principle of least privilege",
+      "7. Add request size limits - prevent memory exhaustion DOS",
+      "8. Add rate limiting - prevent assessment flood attacks",
+      "9. Validate input dicts in build_session - prevent downstream errors",
+      "10. Add content-disposition header escaping - prevent header injection",
+      "11. Add pagination limit to all_records() - prevent timeout on large datasets",
+      "12. Add PDF generation error handling - prevent crashes"
+    ],
+    "high": [
+      "1. Add retry logic with exponential backoff for LLM and DynamoDB calls",
+      "2. Add circuit breaker for external API failures",
+      "3. Add structured logging to all endpoints and agents",
+      "4. Add health check endpoint for load balancer",
+      "5. Add error alerting/metrics collection",
+      "6. Escape HTML in scorecard and PDF outputs",
+      "7. Add input validation on all API parameters",
+      "8. Add DynamoDB encryption at rest",
+      "9. Add timeout on research API calls",
+      "10. Add API key validation and session management",
+      "11. Add YAML file size limits",
+      "12. Redact PII from LLM prompts and logs",
+      "13. Add exception handling for YAML parsing",
+      "14. Fix bare exception catching in research module",
+      "15. Add IAM policy scoping for AWS Bedrock",
+      "16. Fix CORS to allow only trusted origins",
+      "17. Add email format validation in Submission model",
+      "18. Implement graceful shutdown handler",
+      "19. Add token usage logging for cost tracking",
+      "20. Add max buffer size for PDF generation"
+    ],
+    "medium": [
+      "1. Add data retention/TTL policy for assessments",
+      "2. Add audit logging for sensitive operations",
+      "3. Add token count validation before sending to LLM",
+      "4. Add request latency metrics and monitoring",
+      "5. Add field validation for email and URLs in Submission",
+      "6. Add environment variable validation in config.py",
+      "7. Add DynamoDB throttle/transient error handling",
+      "8. Add validation for DecisionRequest.decision enum",
+      "9. Add validation on persona_hint parameter",
+      "10. Add HTML escaping in findings/narrative",
+      "11. Add specific exception types in agents and research",
+      "12. Add research truncation warnings in logs",
+      "13. Add AWS credential rotation via STS",
+      "14. Add TrustedHostMiddleware for proxy headers",
+      "15. Add exception handler for Pydantic validation errors",
+      "16. Add score validation in DimensionScore model",
+      "17. Add company name sanitization for URLs",
+      "18. Add logging of agent performance metrics"
+    ]
+  },
+  "remediation_roadmap": {
+    "phase_1_critical_blocking": {
+      "duration": "1-2 days",
+      "items": [
+        "Fix path traversal in content.py load_fixture()",
+        "Add authorization to review endpoints",
+        "Add HTTPS/TLS in terraform",
+        "Add timeout to LLM client",
+        "Add rate limiting middleware",
+        "Implement request size limits"
+      ]
+    },
+    "phase_2_high_priority": {
+      "duration": "3-5 days",
+      "items": [
+        "Add retry logic with exponential backoff",
+        "Add circuit breaker pattern",
+        "Add comprehensive logging",
+        "Add error metrics and alerting",
+        "Implement health check endpoint",
+        "Add HTML/header escaping"
+      ]
+    },
+    "phase_3_medium_priority": {
+      "duration": "1-2 weeks",
+      "items": [
+        "Add data protection (encryption, TTL, audit logs)",
+        "Add input validation across all models",
+        "Implement token counting",
+        "Add AWS IAM policies",
+        "Add graceful shutdown",
+        "PII redaction in logs"
+      ]
+    },
+    "phase_4_ongoing": {
+      "duration": "Continuous",
+      "items": [
+        "Monitoring and alerting expansion",
+        "Dependency security scanning",
+        "Regular security audits",
+        "Performance optimization based on metrics"
+      ]
+    }
+  }
+}

@@ -1,0 +1,14 @@
+account=023138541872 region=us-east-1 cluster=ai-readiness-cluster app=ai-readiness-diagnostic
+==> ECR repository: ai-readiness-diagnostic
+    023138541872.dkr.ecr.us-east-1.amazonaws.com/ai-readiness-diagnostic
+==> DynamoDB table: ai-readiness-sessions (on-demand, PK=id)
+==> ECS cluster: ai-readiness-cluster (Express Mode)
+==> IAM execution role: ecsTaskExecutionRole (for ECR + CloudWatch access)
+==> IAM task role: ai-readiness-diagnostic-task-role (DynamoDB + Bedrock access)
+
+Bootstrap complete.
+  ECR URI:          023138541872.dkr.ecr.us-east-1.amazonaws.com/ai-readiness-diagnostic
+  DynamoDB table:   ai-readiness-sessions
+  ECS cluster:      ai-readiness-cluster
+  task role ARN:    arn:aws:iam::023138541872:role/ai-readiness-diagnostic-task-role
+Next: run ./02-deploy.sh

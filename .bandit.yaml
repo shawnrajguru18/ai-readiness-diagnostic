@@ -1,0 +1,116 @@
+# Bandit Configuration File for AI Diagnostic MVP
+# https://bandit.readthedocs.io/en/latest/
+
+# Exclude specific files from scanning
+exclude_dirs:
+  - '.venv'
+  - 'venv'
+  - '.pytest_cache'
+  - '__pycache__'
+  - '*.egg-info'
+  - 'node_modules'
+
+# Tests to run (all tests enabled by default)
+# Full list: https://bandit.readthedocs.io/en/latest/plugins/index.html
+tests:
+  - B201  # flask_debug_true
+  - B301  # pickle
+  - B302  # marshal
+  - B303  # md5
+  - B304  # cipher
+  - B305  # cipher
+  - B306  # mktemp
+  - B307  # eval
+  - B308  # mark_safe
+  - B309  # httpsconnection
+  - B310  # urllib_urlopen
+  - B311  # random
+  - B312  # telnetlib
+  - B313  # unverified_context
+  - B314  # unverified_context
+  - B315  # unverified_context
+  - B316  # unverified_context
+  - B317  # unverified_context
+  - B318  # unverified_context
+  - B319  # unverified_context
+  - B320  # unverified_context
+  - B321  # unverified_context
+  - B322  # unverified_context
+  - B323  # unverified_context
+  - B324  # hashlib
+  - B325  # tempnam
+  - B401  # import_telnetlib
+  - B402  # import_ftplib
+  - B403  # import_pickle
+  - B404  # import_subprocess
+  - B405  # import_xml
+  - B406  # import_xml
+  - B407  # import_xml
+  - B408  # import_xml
+  - B409  # import_xml
+  - B410  # import_xml
+  - B411  # import_xmlrpc
+  - B412  # import_httpoxy
+  - B413  # import_pycrypto
+  - B501  # request_verify
+  - B502  # flask_session_cookie
+  - B503  # flask_session_cookie
+  - B504  # flask_session_cookie
+  - B505  # weak_cryptographic_key
+  - B506  # yaml_load
+  - B507  # ssh_no_host_key_verification
+  - B601  # paramiko_calls
+  - B602  # shell_injection
+  - B603  # subprocess_without_shell
+  - B604  # any_other_function_with_shell_equals_true
+  - B605  # any_other_function_with_shell_equals_true
+  - B606  # any_other_function_with_shell_equals_true
+  - B607  # start_process_with_partial_path
+  - B608  # hardcoded_sql_string
+  - B609  # wildcard_injection
+  - B610  # sql_injection
+  - B611  # sql_injection
+  - B701  # jinja2_autoescape_false
+  - B702  # mako_templates
+  - B703  # django_mark_safe
+  - B704  # django_template_string
+
+# Tests to skip (none by default, but can override)
+skips: []
+
+# Assertion severity (only flag assert statements with high confidence)
+assert_used:
+  skips:
+    - '*/tests/*'  # Don't flag assertions in tests
+
+# Exclude test files from hardcoded password checks
+hardcoded_password_string:
+  word_list:
+    - password
+    - secret
+    - key
+    - token
+    - api_key
+    - passwd
+    - pwd
+    - auth
+    - credentials
+    - cred
+
+# Configuration for specific test plugins
+general:
+  # Don't report on test files
+  test_patterns:
+    - tests/
+    - test_*.py
+
+# Report configuration
+# Available levels: NOTSET, DEBUG, INFO, WARN, ERROR
+# Available severity levels: LOW, MEDIUM, HIGH
+report:
+  # Only report findings with at least this severity
+  # (other levels are still detected, but not printed)
+  min_severity: MEDIUM
+
+# For detailed configuration options, see:
+# https://bandit.readthedocs.io/en/latest/configuration/

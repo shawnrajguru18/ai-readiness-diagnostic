@@ -1,0 +1,116 @@
+================================================================================
+POST-DESTROY VALIDATION CHECKLIST - AI Readiness Diagnostic MVP
+================================================================================
+AWS Account: 023138541872
+Region: us-east-1
+Date: 2026-07-10
+Status: Run this AFTER terraform destroy completes
+
+================================================================================
+SECTION 1: TERRAFORM STATE VERIFICATION
+================================================================================
+
+[] 1.1 Verify State File is Empty
+    Command: cd terraform && terraform state list
+    Expected: (empty output - no resources)
+
+[] 1.2 Verify State List Count
+    Command: cd terraform && terraform state list | wc -l
+    Expected: 0
+
+[] 1.3 Verify terraform.tfstate JSON
+    Command: cd terraform && cat terraform.tfstate | jq '.resources | length'
+    Expected: 0
+
+[] 1.4 Check for Terraform Lock Files
+    Command: cd terraform && ls -la .terraform.tfstate.lock* 2>/dev/null
+    Expected: No lock files found
+
+================================================================================
+SECTION 2: AWS RESOURCE VERIFICATION
+================================================================================
+
+[] 2.1 ECS Cluster Deleted
+    Command: aws ecs describe-clusters --clusters ai-readiness-cluster --region us-east-1
+    Expected: Cluster status INACTIVE or not found
+
+[] 2.2 DynamoDB Table Deleted
+    Command: aws dynamodb describe-table --table-name ai-readiness-sessions --region us-east-1 2>&1 | grep ResourceNotFoundException
+    Expected: ResourceNotFoundException
+
+[] 2.3 ECR Repository Deleted
+    Command: aws ecr describe-repositories --repository-names ai-readiness-diagnostic --region us-east-1 2>&1 | grep RepositoryNotFoundException
+    Expected: RepositoryNotFoundException
+
+[] 2.4 CloudWatch Log Group Deleted
+    Command: aws logs describe-log-groups --log-group-name-prefix /ecs/ai-readiness-diagnostic --region us-east-1
+    Expected: Empty result
+
+[] 2.5 IAM Task Role Deleted
+    Command: aws iam get-role --role-name ai-readiness-diagnostic-task-role 2>&1 | grep NoSuchEntity
+    Expected: NoSuchEntity
+
+[] 2.6 IAM Execution Role Deleted
+    Command: aws iam get-role --role-name ai-readiness-diagnostic-execution-role 2>&1 | grep NoSuchEntity
+    Expected: NoSuchEntity
+
+[] 2.7 Security Group Deleted
+    Command: aws ec2 describe-security-groups --group-names ai-readiness-diagnostic-ecs-tasks --region us-east-1 2>&1 | grep InvalidGroup
+    Expected: InvalidGroup.NotFound
+
+================================================================================
+SECTION 3: BACKUP VERIFICATION
+================================================================================
+
+[] 3.1 DynamoDB Backup File Exists
+    Command: ls -lh ai-readiness-sessions-backup-*.json
+    Expected: File exists and readable
+
+[] 3.2 CloudWatch Logs Backup File Exists
+    Command: ls -lh cloudwatch-logs-*.txt
+    Expected: File exists and readable
+
+[] 3.3 Terraform State Backup Exists
+    Command: ls -lh terraform/terraform.tfstate.backup.*
+    Expected: At least one backup file
+
+================================================================================
+SECTION 4: GIT & DOCUMENTATION
+================================================================================
+
+[] 4.1 Git Status Clean
+    Command: cd terraform && git status
+    Expected: Working tree clean
+
+[] 4.2 Commit Deprovisioning
+    Command: git add -A && git commit -m "Deprovisioning: Terraform destroy completed"
+    Expected: Commit succeeds
+
+[] 4.3 Push to Remote
+    Command: git push origin main
+    Expected: Changes pushed successfully
+
+================================================================================
+SECTION 5: COST VERIFICATION
+================================================================================
+
+[] 5.1 AWS Billing Console Checked
+    Steps: Go to AWS Billing > check account 023138541872
+    Expected: No new charges for deleted resources
+
+[] 5.2 Cost Savings Estimated
+    Previous monthly cost: ~$60-88
+    Annual savings: ~$720-1,056
+
+================================================================================
+FINAL SIGN-OFF
+================================================================================
+
+All verification checks passed: [ ] YES
+
+Date & Time:        ________________________
+Verified By:        ________________________
+
+DEPROVISIONING SUCCESSFULLY COMPLETED
+
+Archive backups and update documentation.

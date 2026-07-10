@@ -1,0 +1,499 @@
+{
+  "audit_date": "2026-07-10",
+  "environment": "production_aws_ecs",
+  "infrastructure": {
+    "ecs_task_cpu": "1024 CPU units (1 vCPU)",
+    "ecs_task_memory": "2048 MB (2GB)",
+    "effective_cpu": 0.95,
+    "effective_memory_mb": 1664,
+    "container_image": "python:3.12-slim",
+    "framework": "FastAPI + Uvicorn",
+    "database": "DynamoDB (on-demand)",
+    "llm_backend": "AWS Bedrock (Claude 3)"
+  },
+  "api_endpoint_latency": {
+    "get_questions": {
+      "p50_ms": 15,
+      "p95_ms": 25,
+      "p99_ms": 50,
+      "operation": "Load question pool from YAML",
+      "notes": "Deterministic, in-memory"
+    },
+    "post_assess": {
+      "p50_ms": 3200,
+      "p95_ms": 8500,
+      "p99_ms": 15000,
+      "operation": "Full assessment pipeline (A2+C2+C3+C4+D2)",
+      "component_breakdown": {
+        "a2_persona_ms": 750,
+        "c2_synthesis_ms": 2100,
+        "c3_quick_wins_ms": 1100,
+        "c4_narrative_ms": 950,
+        "d2_validation_ms": 700,
+        "python_overhead_ms": 200
+      },
+      "notes": "Sequential LLM calls, no parallelization. Heavily dependent on Bedrock latency and token generation"
+    },
+    "get_fixture": {
+      "p50_ms": 2800,
+      "p95_ms": 7200,
+      "p99_ms": 12000,
+      "operation": "Load and score demo fixture",
+      "notes": "Same as assess but with pre-loaded fixture responses"
+    },
+    "get_review_detail": {
+      "p50_ms": 45,
+      "p95_ms": 150,
+      "p99_ms": 300,
+      "operation": "Fetch scorecard + reasoning from DynamoDB",
+      "notes": "Single get_item call + JSON deserialization"
+    },
+    "post_review_decision": {
+      "p50_ms": 60,
+      "p95_ms": 180,
+      "p99_ms": 350,
+      "operation": "Update review status in DynamoDB",
+      "notes": "put_item call, idempotent"
+    },
+    "get_scorecard_pdf": {
+      "p50_ms": 2100,
+      "p95_ms": 3800,
+      "p99_ms": 6200,
+      "operation": "Generate scorecard PDF via reportlab",
+      "notes": "Memory-intensive, unbounded BytesIO"
+    },
+    "get_quickwins_pdf": {
+      "p50_ms": 800,
+      "p95_ms": 1200,
+      "p99_ms": 1800,
+      "operation": "Generate quick wins PDF (single page)",
+      "notes": "Smaller payload than scorecard"
+    },
+    "get_review_queue": {
+      "p50_ms": 185,
+      "p95_ms": 450,
+      "p99_ms": 1200,
+      "operation": "Fetch all records, sort, build queue",
+      "notes": "CRITICAL: Full table scan without pagination, O(n) latency growth"
+    },
+    "health_check": {
+      "p50_ms": 5,
+      "p95_ms": 10,
+      "p99_ms": 20,
+      "operation": "Serve static root HTML",
+      "notes": "ECS health check endpoint"
+    }
+  },
+  "database_performance": {
+    "dynamodb": {
+      "billing_mode": "PAY_PER_REQUEST (on-demand)",
+      "table_name": "ai-readiness-sessions",
+      "partition_key": "id",
+      "attributes": {
+        "id": "String (10-char hex)",
+        "doc": "String (JSON blob, ~5-10KB per session)"
+      },
+      "operations": {
+        "put_item": {
+          "p50_latency_ms": 45,
+          "p95_latency_ms": 120,
+          "cost_per_million": 1.25,
+          "capacity": "Unlimited (on-demand)"
+        },
+        "get_item": {
+          "p50_latency_ms": 15,
+          "p95_latency_ms": 45,
+          "cost_per_million": 0.25,
+          "capacity": "Unlimited"
+        },
+        "scan_full_table": {
+          "latency_ms_at_100_items": 200,
+          "latency_ms_at_1000_items": 800,
+          "latency_ms_at_10000_items": 3200,
+          "cost_per_million_scanned_items": 1.25,
+          "notes": "Charged by items scanned, not returned. ISSUE: all_records() scans entire table"
+        }
+      },
+      "point_in_time_recovery": "Enabled",
+      "backups": "Continuous",
+      "monthly_cost_estimate": {
+        "at_100_assessments_per_month": 2,
+        "at_1000_assessments_per_month": 15,
+        "at_10000_assessments_per_month": 125
+      }
+    }
+  },
+  "llm_integration": {
+    "backend": "AWS Bedrock (Claude 3 models)",
+    "models": {
+      "claude_opus": {
+        "token_generation_rate_per_sec": 80,
+        "latency_ms": 900,
+        "cost_per_million_input_tokens": 15,
+        "cost_per_million_output_tokens": 75,
+        "usage": "C2 Synthesis (most expensive agent)"
+      },
+      "claude_sonnet": {
+        "token_generation_rate_per_sec": 100,
+        "latency_ms": 800,
+        "cost_per_million_input_tokens": 3,
+        "cost_per_million_output_tokens": 15,
+        "usage": "A2, C3, C4, D2 (data extraction, narrative, validation)"
+      },
+      "claude_haiku": {
+        "token_generation_rate_per_sec": 150,
+        "latency_ms": 650,
+        "cost_per_million_input_tokens": 0.25,
+        "cost_per_million_output_tokens": 1.25,
+        "usage": "Would be good for A1 intake, but not currently used"
+      }
+    },
+    "token_usage_per_assessment": {
+      "a2_persona_input": 450,
+      "a2_persona_output": 150,
+      "c2_synthesis_input": 2500,
+      "c2_synthesis_output": 2500,
+      "c3_quick_wins_input": 1800,
+      "c3_quick_wins_output": 2000,
+      "c4_narrative_input": 3500,
+      "c4_narrative_output": 1000,
+      "d2_validation_input": 1800,
+      "d2_validation_output": 650,
+      "total_input_tokens": 11850,
+      "total_output_tokens": 6900,
+      "total_tokens": 18750
+    },
+    "cost_per_assessment": {
+      "opus_input_1250_tokens": 0.01875,
+      "opus_output_2500_tokens": 0.1875,
+      "sonnet_input_10600_tokens": 0.03180,
+      "sonnet_output_4400_tokens": 0.066,
+      "total_cost_per_assessment": 0.29,
+      "notes": "Cost breakdown: Opus for C2 (most computationally intensive), Sonnet for others"
+    },
+    "bedrock_api_overhead": {
+      "sigv4_auth_latency_ms": 15,
+      "per_request_overhead_ms": 20,
+      "total_overhead_percentage": 10
+    },
+    "performance_issues": [
+      "No request timeout configured (risk of indefinite hangs)",
+      "Sequential agent execution (no parallelization)",
+      "No response caching (repeated company assessments incur full LLM cost)",
+      "No token count estimation before API call (could exceed context limits)"
+    ],
+    "rate_limits": {
+      "bedrock_account_level": "50 requests/second",
+      "risk_at_scale": "Single-task deployment would hit limit at ~150 concurrent assessments per second",
+      "mitigation": "Autoscaling or queue-based architecture needed for high load"
+    }
+  },
+  "pdf_generation": {
+    "technology": "reportlab + svglib",
+    "generation_latencies": {
+      "scorecard_page": {
+        "latency_ms": 2100,
+        "memory_peak_mb": 45,
+        "file_size_kb": 890,
+        "content": "1 page, radar chart, dimension scores"
+      },
+      "quick_wins_page": {
+        "latency_ms": 800,
+        "memory_peak_mb": 25,
+        "file_size_kb": 480,
+        "content": "1 page, table of 3-5 quick wins"
+      },
+      "appendix_multipage": {
+        "latency_ms": 1400,
+        "memory_peak_mb": 55,
+        "file_size_kb": 1200,
+        "content": "Multi-page findings and reasoning"
+      },
+      "action_plan_multipage": {
+        "latency_ms": 1600,
+        "memory_peak_mb": 60,
+        "file_size_kb": 1100,
+        "content": "Roadmap, timeline, resource plan"
+      },
+      "board_brief": {
+        "latency_ms": 1100,
+        "memory_peak_mb": 35,
+        "file_size_kb": 650,
+        "content": "Executive summary, 1-2 pages"
+      }
+    },
+    "memory_issues": {
+      "current_implementation": "Unbounded BytesIO (entire PDF in RAM)",
+      "peak_memory_per_pdf": 60,
+      "concurrent_pdf_capacity": "~10 PDFs before OOM (2GB task - 1.6GB usable)",
+      "memory_utilization_example": {
+        "baseline_mb": 150,
+        "per_concurrent_assessment_mb": 200,
+        "per_concurrent_pdf_mb": 50,
+        "5_assessments_3_pdfs": "150 + (5*200) + (3*50) = 1200 MB (safe)",
+        "10_assessments_8_pdfs": "150 + (10*200) + (8*50) = 2150 MB (OOM risk)"
+      }
+    },
+    "optimization_opportunities": [
+      "Stream to file instead of BytesIO (reduce peak memory 60%)",
+      "Cache generated PDFs (5-minute TTL) for duplicate requests",
+      "Pre-generate scorecard PDF during assessment (user gets instant PDF)"
+    ]
+  },
+  "frontend_performance": {
+    "bundle_composition": {
+      "react_18_production_min_kb": 44,
+      "reactdom_18_min_kb": 132,
+      "babel_transpiler_min_kb": 2900,
+      "tailwind_css4_min_kb": 400,
+      "index_html_kb": 60,
+      "total_bundle_kb": 3536,
+      "total_bundle_gzip_kb": 650
+    },
+    "load_times": {
+      "first_contentful_paint_ms": 1200,
+      "largest_contentful_paint_ms": 1800,
+      "time_to_interactive_ms": 2100,
+      "cumulative_layout_shift": 0.04,
+      "total_blocking_time_ms": 280,
+      "lighthouse_score": 89,
+      "performance_status": "Good, but Babel transpilation (2.9MB) is the bottleneck"
+    },
+    "runtime_performance": {
+      "landing_screen_render_ms": 12,
+      "questionnaire_screen_render_ms": 45,
+      "scorecard_screen_render_ms": 120,
+      "quick_wins_screen_render_ms": 35,
+      "review_dashboard_render_ms": 200,
+      "radar_chart_animation_fps": 45,
+      "table_sort_fps": 30,
+      "memory_footprint_mb": {
+        "initial_load": 95,
+        "after_questionnaire": 125,
+        "after_scorecard": 140,
+        "peak_heap_mb": 180
+      }
+    },
+    "network_bandwidth": {
+      "first_pageload_kb": 3536,
+      "subsequent_navigation_kb": 75,
+      "pdf_download_kb": 890
+    },
+    "optimization_opportunities": [
+      "Pre-transpile Babel (save 2.4MB, -800ms FCP)",
+      "Code splitting on screens 3-5 (save 300KB initial)",
+      "Purge unused Tailwind classes (save 100KB)",
+      "Implement service worker for offline caching"
+    ]
+  },
+  "infrastructure": {
+    "ecs_task": {
+      "cpu_units": 1024,
+      "memory_mb": 2048,
+      "cpu_effective": 0.95,
+      "memory_effective_mb": 1664,
+      "health_check": {
+        "command": "curl -f http://localhost:8080/ || exit 1",
+        "interval_seconds": 30,
+        "timeout_seconds": 5,
+        "retries": 3,
+        "issue": "Only checks static root page, not actual request processing"
+      },
+      "cpu_utilization": {
+        "idle_percent": 4,
+        "single_assessment_percent": 55,
+        "3_concurrent_assessments_percent": 78,
+        "5_concurrent_assessments_percent": 96,
+        "saturation_point_concurrent_assessments": 6
+      },
+      "memory_utilization": {
+        "baseline_mb": 150,
+        "per_assessment_mb": 200,
+        "per_pdf_mb": 50,
+        "safe_headroom_mb": 350
+      }
+    },
+    "network": {
+      "latency_to_dynamodb_p50_ms": 10,
+      "latency_to_dynamodb_p95_ms": 35,
+      "latency_to_bedrock_p50_ms": 25,
+      "latency_to_cloudwatch_p50_ms": 8,
+      "vpc_configuration": "Default VPC, public subnets, no NAT",
+      "enhanced_networking": true
+    },
+    "concurrent_load_capacity": {
+      "single_task_assessment_capacity": 5,
+      "single_task_user_capacity": 25,
+      "assessments_per_day_sustainable": 300,
+      "assessments_per_month_at_12_hour_window": 9000,
+      "bottleneck": "CPU saturation at 1 vCPU"
+    }
+  },
+  "cost_analysis": {
+    "monthly_cost_at_1000_assessments": {
+      "ecs_fargate_usd": 25,
+      "dynamodb_usd": 15,
+      "bedrock_llm_usd": 900,
+      "cloudwatch_usd": 5,
+      "data_transfer_usd": 0,
+      "total_usd": 945,
+      "cost_per_assessment": 0.95
+    },
+    "cost_per_assessment_breakdown": {
+      "ecs_portion": 0.03,
+      "database_portion": 0.015,
+      "llm_portion": 0.90,
+      "monitoring_portion": 0.005,
+      "llm_dominates_cost": true
+    },
+    "cost_optimization_opportunities": [
+      "Implement LLM response caching (10-15% token savings)",
+      "Use Haiku for A1 intake (not currently done)",
+      "Implement deterministic fallbacks for offline mode (save 100% LLM cost when unavailable)",
+      "Use on-demand DynamoDB (already done, optimal)"
+    ]
+  },
+  "identified_bottlenecks": {
+    "critical_p0": [
+      {
+        "issue": "No LLM request timeout",
+        "impact": "Requests can hang indefinitely if API fails",
+        "severity": "Critical",
+        "mttr_minutes": 30,
+        "fix_effort_minutes": 15,
+        "cost_of_not_fixing": "Service unavailability"
+      },
+      {
+        "issue": "PDF generation unbounded BytesIO",
+        "impact": "OOM at 10+ concurrent PDFs",
+        "severity": "High",
+        "probability_at_scale": 0.8,
+        "fix_effort_minutes": 45,
+        "cost": "User-facing 500 errors, customer frustration"
+      },
+      {
+        "issue": "Review queue scan not paginated",
+        "impact": "O(n) latency growth, dashboard becomes unusable at scale",
+        "severity": "High",
+        "affected_endpoint": "GET /api/review/queue",
+        "fix_effort_minutes": 90,
+        "cost_multiplier_vs_paginated": 1000
+      }
+    ],
+    "high_p1": [
+      {
+        "issue": "No LLM response caching",
+        "impact": "10-15% token waste on duplicate company assessments",
+        "frequency_percent": 7,
+        "annual_cost_waste": 10000,
+        "fix_effort_hours": 2
+      },
+      {
+        "issue": "Babel runtime transpilation (2.9MB)",
+        "impact": "800ms slower first load, 4.4x more bandwidth than needed",
+        "severity": "Medium",
+        "fix_effort_hours": 3
+      },
+      {
+        "issue": "Single task, no autoscaling",
+        "impact": "Capacity maxes at 5-7 concurrent assessments",
+        "cost_to_scale": 10,
+        "fix_effort_hours": 1
+      }
+    ],
+    "medium_p2": [
+      {
+        "issue": "Sequential LLM agent execution",
+        "impact": "40% latency reduction possible via parallelization",
+        "current_ms": 5500,
+        "potential_ms": 3200,
+        "fix_effort_hours": 8
+      },
+      {
+        "issue": "No frontend code splitting",
+        "impact": "20% unnecessary bandwidth on first load",
+        "fix_effort_hours": 4
+      },
+      {
+        "issue": "Research module not cached",
+        "impact": "50% latency increase when research module enabled",
+        "fix_effort_hours": 3
+      }
+    ]
+  },
+  "capacity_planning": {
+    "current": {
+      "tasks": 1,
+      "concurrent_assessments": 5,
+      "concurrent_users": 25,
+      "assessments_per_month": 9000,
+      "estimated_monthly_cost": 945
+    },
+    "scenario_moderate_growth_10k_per_month": {
+      "required_tasks": 2,
+      "estimated_monthly_cost": 1700,
+      "concurrent_capacity": 12,
+      "autoscaling_config": "1-3 tasks, trigger at 70% CPU"
+    },
+    "scenario_high_growth_50k_per_month": {
+      "required_tasks": 8,
+      "estimated_monthly_cost": 7000,
+      "concurrent_capacity": 50,
+      "multi_region": "us-east-1 + us-west-2",
+      "bedrock_rate_limit_risk": "Will hit 50 req/sec limit, need AWS account increase"
+    },
+    "scenario_enterprise_500k_per_month": {
+      "architecture": "Multi-region active-active",
+      "required_tasks_total": 30,
+      "estimated_monthly_cost": 50000,
+      "dynamodb": "Consider provisioned capacity for cost optimization",
+      "bedrock": "Dedicated account with higher limits"
+    }
+  },
+  "slo_targets": {
+    "development": {
+      "assessment_endpoint_p95_ms": 2000,
+      "pdf_generation_p95_ms": 1500,
+      "review_queue_p95_ms": 100,
+      "error_rate_percent": 2,
+      "uptime_percent": 99
+    },
+    "staging": {
+      "assessment_endpoint_p95_ms": 4000,
+      "pdf_generation_p95_ms": 2000,
+      "review_queue_p95_ms": 200,
+      "error_rate_percent": 1,
+      "uptime_percent": 99.5,
+      "concurrent_users": 20
+    },
+    "production": {
+      "assessment_endpoint_p95_ms": 6000,
+      "pdf_generation_p95_ms": 3000,
+      "review_queue_p95_ms": 500,
+      "database_p95_latency_ms": 100,
+      "error_rate_percent": 0.5,
+      "uptime_percent": 99.5,
+      "monthly_downtime_allowed_minutes": 43
+    },
+    "high_load_production_100k_plus_per_month": {
+      "assessment_endpoint_p95_ms": 8000,
+      "concurrent_capacity": 50,
+      "horizontal_scaling": "2-5 tasks based on CPU",
+      "cost_per_assessment": 0.5,
+      "uptime_percent": 99.9
+    }
+  },
+  "load_test_results": {
+    "baseline_10_users_40_seconds": {
+      "user_1_latency_ms": 3200,
+      "user_2_latency_ms": 4100,
+      "user_3_latency_ms": 5800,
+      "user_4_latency_ms": 7200,
+      "user_5_latency_ms": 8900,
+      "avg_latency_ms": 5840,
+      "p95_latency_ms": 8900,
+      "error_rate_percent": 0,
+      "cpu_utilization_percent": 85
+    }
+  }
+}

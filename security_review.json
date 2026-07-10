@@ -1,0 +1,107 @@
+[
+  {
+    "file": "app/pdf.py",
+    "line": 170,
+    "summary": "Content injection: User-supplied sc.company_name directly embedded in Paragraph() without HTML/XML escaping. Could contain reportlab markup tags that alter PDF rendering or inject malicious content.",
+    "severity": "high",
+    "fix_recommendation": "Escape user input using reportlab.lib.markup or implement safe text normalization that removes/neutralizes special markup characters before rendering. Create a utility: def escape_pdf_text(s: str) -> str that removes < > { } characters."
+  },
+  {
+    "file": "app/pdf.py",
+    "line": 178,
+    "summary": "Content injection: sc.overall_tier and dimension labels (d.label) directly inserted into f-string with <b> tags without validation. Malformed tier data could break PDF layout or inject markup.",
+    "severity": "high",
+    "fix_recommendation": "Validate sc.overall_tier against known enum values before rendering. Escape d.label with PDF text normalization to prevent markup injection."
+  },
+  {
+    "file": "app/pdf.py",
+    "line": 214,
+    "summary": "Content injection: Finding headline and body (f.headline, f.body) directly rendered without escaping. Agent-generated text could contain special characters or reportlab markup causing rendering issues or injection attacks.",
+    "severity": "high",
+    "fix_recommendation": "Implement a finding_to_safe_html() function that strips/escapes special characters, validates length (max 500 chars for headline, 2000 for body), and removes reportlab markup."
+  },
+  {
+    "file": "app/pdf.py",
+    "line": 223,
+    "summary": "Content injection: Contact email and name (r.contact_email, r.contact_name) rendered without validation. Could contain newlines or special characters that break PDF structure or escape PDF format.",
+    "severity": "medium",
+    "fix_recommendation": "Validate contact fields: r.contact_email against email regex, r.contact_name against alphanumeric+space+punctuation whitelist. Reject if suspicious patterns detected."
+  },
+  {
+    "file": "app/pdf.py",
+    "line": 243,
+    "summary": "Path traversal / DoS: _slug() creates filename from user input with no length validation. Extremely long company names could create pathological filenames (>255 chars on NTFS), causing filesystem errors or enabling path manipulation.",
+    "severity": "medium",
+    "fix_recommendation": "Add max length cap: return re.sub(...).strip(\"-\")[:50] or \"subject\". Validate result is valid filename chars only. Test on Windows (255 char limit)."
+  },
+  {
+    "file": "app/pdf.py",
+    "line": 251,
+    "summary": "Memory leak / DoS: build_scorecard_pdf() writes unbounded BytesIO buffer to disk without size validation. Crafted scorecard object with massive findings/quick_wins lists could generate multi-GB PDFs, exhausting disk space.",
+    "severity": "medium",
+    "fix_recommendation": "Add PDF size check before write_bytes(): pdf_bytes = build_scorecard_pdf(sc); if len(pdf_bytes) > 50*1024*1024: raise ValueError('PDF exceeds 50MB'). Cap story elements in build functions."
+  },
+  {
+    "file": "app/pdf.py",
+    "line": 197,
+    "summary": "Content injection: d.label (dimension label) contains user/LLM-generated text wrapped in HTML-like tags without escaping. Special chars in labels could break font markup or inject reportlab commands.",
+    "severity": "medium",
+    "fix_recommendation": "Validate d.label against whitelist (alphanumeric, spaces, hyphens, ampersands only). Limit to 100 chars. Remove or escape < > { } characters before rendering."
+  },
+  {
+    "file": "app/pdf.py",
+    "line": 233,
+    "summary": "Content injection: q.pattern_name, q.one_line_description rendered without HTML escaping. LLM-generated quick-win data could contain markup or control characters.",
+    "severity": "medium",
+    "fix_recommendation": "Create sanitize_quick_win_text() that escapes special chars and validates length (pattern_name <= 100, description <= 300 chars). Apply before all Paragraph() calls using quick_win fields."
+  },
+  {
+    "file": "app/pdf.py",
+    "line": 63,
+    "summary": "Silent exception: Broad 'except Exception: return None' in _logo_flowable() masks real errors (file not found, SVG parsing errors, permission issues). Failures silently degrade instead of alerting admins.",
+    "severity": "low",
+    "fix_recommendation": "Catch specific exceptions: except FileNotFoundError:... except Exception as e: logger.warning(f'Logo load failed: {e}'). Re-raise unexpected errors for monitoring."
+  },
+  {
+    "file": "app/pdf.py",
+    "line": 244,
+    "summary": "Performance: Import 're' module inside _slug() function. Called on every PDF save (lines 250, 352, 434, 525), causing repeated module lookups and JIT compilation cost.",
+    "severity": "low",
+    "fix_recommendation": "Move 'import re' to module top (line 5). Python will cache it, avoiding repeated import overhead on every call."
+  },
+  {
+    "file": "app/pdf.py",
+    "line": 289,
+    "summary": "Performance: Import 'math' aliased as '_m' inside VDChart.draw(). This method may be called multiple times during document building, causing redundant imports.",
+    "severity": "low",
+    "fix_recommendation": "Remove local import and rely on module-level 'import math' (line 5). Update references from '_m.pi' to 'math.pi', '_m.cos' to 'math.cos', '_m.sin' to 'math.sin'."
+  },
+  {
+    "file": "app/content.py",
+    "line": 33,
+    "summary": "Path traversal: load_fixture(name: str) accepts arbitrary filenames with no validation. Attacker could call load_fixture('../../secrets.yaml') to read files outside FIXTURE_DIR.",
+    "severity": "high",
+    "fix_recommendation": "Validate filename: whitelist known fixture names OR assert that (FIXTURE_DIR / name.yaml).resolve().parent == FIXTURE_DIR to prevent .. traversal. Reject if path escapes FIXTURE_DIR."
+  },
+  {
+    "file": "app/content.py",
+    "line": 14,
+    "summary": "Memory leak / DoS: read_text() loads entire question_pool.yaml into memory with no size limit. Attacker could replace YAML with multi-GB file, causing OOM.",
+    "severity": "medium",
+    "fix_recommendation": "Add size check: path = CONTENT_DIR / 'question_pool.yaml'; if path.stat().st_size > 10*1024*1024: raise ValueError('Question pool exceeds 10MB'). Apply to all read_text() calls."
+  },
+  {
+    "file": "app/content.py",
+    "line": 14,
+    "summary": "Missing schema validation: yaml.safe_load() doesn't validate structure. Malformed YAML (missing 'questions' key, wrong types) would cause KeyError at runtime instead of early validation.",
+    "severity": "low",
+    "fix_recommendation": "After yaml.safe_load(), validate: assert isinstance(result, dict) and 'questions' in result and isinstance(result['questions'], list). Add type hints for return values."
+  },
+  {
+    "file": "app/content.py",
+    "line": 24,
+    "summary": "No error handling: load_quick_wins() will raise KeyError if YAML is missing 'patterns' key. No try/except to gracefully handle corrupted or missing content files.",
+    "severity": "low",
+    "fix_recommendation": "Wrap load: try: return yaml.safe_load(...)['patterns'] except (FileNotFoundError, KeyError) as e: raise ValueError(f'Invalid quick_wins.yaml: {e}'). Return empty list with warning if missing."
+  }
+]

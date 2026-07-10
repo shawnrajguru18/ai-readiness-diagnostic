@@ -1,0 +1,157 @@
+================================================================================
+PRE-DESTROY CHECKLIST - AI Readiness Diagnostic MVP
+================================================================================
+AWS Account: 023138541872
+Region: us-east-1
+Date: 2026-07-10
+Status: Complete this checklist BEFORE running terraform destroy
+
+================================================================================
+SECTION 1: BACKUP & VERIFICATION
+================================================================================
+
+[ ] 1.1 Export DynamoDB Data
+    Command: aws dynamodb scan --table-name ai-readiness-sessions --region us-east-1 --output json > ai-readiness-sessions-backup-$(date +%Y%m%d).json
+    Verify: du -h ai-readiness-sessions-backup-*.json && echo "File size OK"
+    
+[ ] 1.2 Export CloudWatch Logs
+    Command: aws logs tail /ecs/ai-readiness-diagnostic --region us-east-1 --follow=false > cloudwatch-logs-$(date +%Y%m%d).txt
+    Verify: wc -l cloudwatch-logs-*.txt
+    
+[ ] 1.3 Backup Terraform State
+    Command: cd terraform && cp terraform.tfstate terraform.tfstate.backup.$(date +%Y%m%d)
+    Verify: ls -la terraform/terraform.tfstate.backup.*
+
+[ ] 1.4 Verify Data is Test-Only
+    Command: jq '.Items[0:5] | map(.id.S)' ai-readiness-sessions-backup-*.json
+    Expected: Only test fixture IDs (MeridianFS, NorthernCare, AurelianTech)
+    ⚠️  STOP if you see any production or customer data!
+
+[ ] 1.5 Verify No Sensitive Data in Logs
+    Command: grep -i "password\|secret\|key\|credential" cloudwatch-logs-*.txt
+    Expected: No results or only application logs
+    ⚠️  STOP if credentials are exposed in logs!
+
+================================================================================
+SECTION 2: TERRAFORM VALIDATION
+================================================================================
+
+[ ] 2.1 Validate Terraform Configuration
+    Command: cd terraform && terraform validate
+    Expected: "Success! The configuration is valid."
+
+[ ] 2.2 Check State File Integrity
+    Command: cd terraform && terraform state list | wc -l
+    Expected: Should be ~15 resources
+    Actual count: _____ (write the number)
+
+[ ] 2.3 List Resources to be Destroyed
+    Command: cd terraform && terraform state list
+    Resources found:
+    ___________________________________________________________________
+    (paste output here)
+
+[ ] 2.4 Review Destroy Plan (DRY RUN)
+    Command: cd terraform && terraform plan -destroy -out=destroy.tfplan
+    Expected: Plan: X to add, Y to change, Z to destroy
+    Verify destruction targets match your expectations
+    
+[ ] 2.5 Review Terraform Files (Sanity Check)
+    Command: ls -la terraform/*.tf | grep -E "(ecs|dynamodb|ecr|iam)" 
+    Expected: See main.tf, ecs.tf, dynamodb.tf, ecr.tf, iam.tf, etc.
+
+================================================================================
+SECTION 3: AWS ACCOUNT VERIFICATION
+================================================================================
+
+[ ] 3.1 Verify AWS Credentials
+    Command: aws sts get-caller-identity
+    Expected output:
+    {
+        "UserId": "...",
+        "Account": "023138541872",   <-- Must match this
+        "Arn": "arn:aws:iam::023138541872:user/..."
+    }
+    ⚠️  STOP if Account is NOT 023138541872!
+
+[ ] 3.2 Verify AWS Region
+    Command: echo $AWS_REGION or aws configure get region
+    Expected: us-east-1
+    ⚠️  STOP if region is wrong!
+
+[ ] 3.3 Check Current Resources Exist
+    Command: cd terraform && terraform apply -json -no-color 2>/dev/null | jq '.type == "resource"' | head -1
+    Or manually check AWS Console:
+    - ECS Cluster: ai-readiness-cluster ✓
+    - ECS Service: ai-readiness-diagnostic ✓
+    - DynamoDB Table: ai-readiness-sessions ✓
+    - ECR Repository: ai-readiness-diagnostic ✓
+    - CloudWatch Logs: /ecs/ai-readiness-diagnostic ✓
+
+[ ] 3.4 No Prod URLs/DNS Pointing to Test IP
+    Command: grep -r "54.236.26.147\|54.209.53.225" . --include="*.py" --include="*.js" --include="*.yaml" --include="*.md" 2>/dev/null
+    Expected: No matches in application code
+    ⚠️  STOP if test IP is hardcoded in prod config!
+
+================================================================================
+SECTION 4: GIT & DOCUMENTATION
+================================================================================
+
+[ ] 4.1 All Work Committed to Main
+    Command: git status
+    Expected: "On branch main" and "nothing to commit, working tree clean"
+    ⚠️  STOP if uncommitted changes exist!
+
+[ ] 4.2 Recent Commits Reviewed
+    Command: git log --oneline | head -5
+    Verify recent work is saved
+
+[ ] 4.3 Git Remote is Correct
+    Command: git remote -v
+    Expected: origin points to correct repository
+
+[ ] 4.4 Backup Checklist Printed/Saved
+    This file (pre_destroy_checklist.txt) is saved: ✓
+
+================================================================================
+SECTION 5: EXTERNAL DEPENDENCIES
+================================================================================
+
+[ ] 5.1 No Other Systems Depend on Test Endpoint
+    Question: Does any other application reference http://54.236.26.147:8080 ?
+    Answer: No / Yes (if Yes, update them before destroy)
+
+[ ] 5.2 No External Load Balancers Reference This Service
+    Command: aws elbv2 describe-target-groups --region us-east-1 | grep ai-readiness
+    Expected: No results
+    
+[ ] 5.3 No CloudWatch Alarms Reference Deleted Resources
+    Command: aws cloudwatch describe-alarms --alarm-names "ai-readiness*" --region us-east-1
+    Expected: Empty or irrelevant alarms only
+
+================================================================================
+FINAL SIGN-OFF
+================================================================================
+
+All pre-destroy checks completed: [ ] YES
+
+Date & Time:        ________________________
+Verified By:        ________________________
+Team Lead (if req): ________________________
+
+Notes/Comments:
+___________________________________________________________________
+___________________________________________________________________
+
+================================================================================
+READY TO PROCEED WITH TERRAFORM DESTROY
+================================================================================
+
+Next Steps:
+1. Run: bash deploy/aws/destroy_terraform.sh
+2. Or manually: cd terraform && terraform destroy
+3. When prompted, type "yes" to confirm
+4. Monitor output for any errors
+5. Run post_destroy_validation.txt when complete
+
+================================================================================

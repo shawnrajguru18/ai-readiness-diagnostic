@@ -23,3 +23,8 @@ desired_count = 1
 enable_autoscaling = false
 min_capacity       = 1
 max_capacity       = 3
+
+# VPC and Subnets (optional - uses default VPC/subnets if not provided)
+# If you have IAM permission issues, provide these explicitly:
+# vpc_id    = "vpc-12345678"
+# subnet_ids = ["subnet-11111111", "subnet-22222222"]

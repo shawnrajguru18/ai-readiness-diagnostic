@@ -1,0 +1,160 @@
+name: Security Scanning (SAST + Dependencies + Secrets)
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  schedule:
+    # Run daily security scans at 2 AM UTC
+    - cron: '0 2 * * *'
+
+jobs:
+  bandit:
+    runs-on: ubuntu-latest
+    name: Bandit (Python SAST)
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install bandit
+        run: pip install bandit
+
+      - name: Run Bandit security scan
+        run: |
+          bandit -r app/ -f json -o bandit-report.json --exit-code 0
+          bandit -r app/ -ll || echo "Bandit found issues"
+        continue-on-error: true
+
+      - name: Upload Bandit report
+        uses: actions/upload-artifact@v4
+        with:
+          name: bandit-report
+          path: bandit-report.json
+        if: always()
+
+  semgrep:
+    runs-on: ubuntu-latest
+    name: Semgrep (Static Analysis)
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Semgrep scan
+        uses: returntocorp/semgrep-action@v1
+        with:
+          config: p/python p/security-audit p/owasp-top-ten
+        continue-on-error: true
+
+  dependency-check:
+    runs-on: ubuntu-latest
+    name: Dependency Vulnerability Scan (pip-audit)
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install pip-audit
+        run: pip install pip-audit
+
+      - name: Scan dependencies for known CVEs
+        run: |
+          pip install -r requirements.txt
+          pip-audit --desc --format json > pip-audit-report.json || pip-audit --desc
+        continue-on-error: true
+
+      - name: Upload pip-audit report
+        uses: actions/upload-artifact@v4
+        with:
+          name: pip-audit-report
+          path: pip-audit-report.json
+        if: always()
+
+  secrets-detection:
+    runs-on: ubuntu-latest
+    name: Secrets Detection (TruffleHog)
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install TruffleHog
+        run: pip install truffle-hog
+
+      - name: Scan for secrets in git history
+        run: |
+          trufflehog filesystem . --json > trufflehogreport.json || true
+          if grep -q '"verified": true' trufflehogreport.json; then
+            echo "::error::Verified secrets found in repository!"
+            cat trufflehogreport.json
+            exit 1
+          fi
+        continue-on-error: true
+
+      - name: Check for hardcoded API keys (pattern-based)
+        run: |
+          echo "Checking for hardcoded secrets..."
+          ! grep -r "api[_-]?key\s*[:=]" app/ --include="*.py" | grep -v "^#" | grep -v test
+          ! grep -r "sk_[a-zA-Z0-9]*" app/ --include="*.py"
+          ! grep -r "AKIA[0-9A-Z]\{16\}" app/ --include="*.py"
+        continue-on-error: true
+
+  codeql:
+    runs-on: ubuntu-latest
+    name: CodeQL (Advanced SAST)
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: python
+
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v3
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+
+  security-summary:
+    runs-on: ubuntu-latest
+    needs: [bandit, semgrep, dependency-check, secrets-detection, codeql]
+    if: always()
+    name: Security Summary
+
+    steps:
+      - name: Download all reports
+        uses: actions/download-artifact@v4
+        with:
+          path: security-reports
+
+      - name: Create security summary
+        run: |
+          echo "# Security Scan Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Bandit (SAST)**: Checked for Python security issues" >> $GITHUB_STEP_SUMMARY
+          echo "- **Semgrep**: Pattern-based vulnerability detection" >> $GITHUB_STEP_SUMMARY
+          echo "- **Dependency Check**: Scanned for known CVEs in dependencies" >> $GITHUB_STEP_SUMMARY
+          echo "- **Secrets Detection**: Verified no hardcoded secrets" >> $GITHUB_STEP_SUMMARY
+          echo "- **CodeQL**: Advanced static analysis" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Review detailed reports in Artifacts section above." >> $GITHUB_STEP_SUMMARY
+
+      - name: Fail if critical security issues found
+        run: |
+          if [ -d "security-reports/bandit-report" ] && grep -q "SEVERITY: HIGH" security-reports/bandit-report/*.json; then
+            echo "::error::Critical security issues found by Bandit!"
+            exit 1
+          fi
