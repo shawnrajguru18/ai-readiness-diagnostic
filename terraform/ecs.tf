@@ -115,6 +115,7 @@ resource "aws_ecs_service" "app" {
   tags = local.tags
 
   depends_on = [
+    aws_ecs_cluster_capacity_providers.main,
     aws_iam_role_policy.task_role_dynamodb,
     aws_iam_role_policy.task_role_bedrock
   ]
