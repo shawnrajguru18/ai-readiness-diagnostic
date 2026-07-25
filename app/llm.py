@@ -10,6 +10,7 @@ Uses AWS Bedrock for Claude access (SigV4 auth via IAM, no API key needed).
 from __future__ import annotations
 from typing import Any, Sequence, Type, TypeVar
 from pydantic import BaseModel
+import boto3
 
 from anthropic import AnthropicBedrock
 
@@ -21,6 +22,23 @@ import logging
 logger = logging.getLogger(__name__)
 
 # Resolves AWS credentials from environment/IAM roles (SigV4).
+import os
+import sys
+_aws_key = os.environ.get("AWS_ACCESS_KEY_ID", "not set")
+_aws_secret = os.environ.get("AWS_SECRET_ACCESS_KEY", "not set")
+_aws_session = os.environ.get("AWS_SESSION_TOKEN", "not set")
+_env_summary = f"Key={_aws_key[:10] if _aws_key != 'not set' else 'not set'}..., Secret set={_aws_secret != 'not set'}, Session set={_aws_session != 'not set'}"
+logger.info(f"Environment credentials: {_env_summary}")
+
+try:
+    _creds = boto3.Session().get_credentials()
+    if _creds:
+        logger.info(f"boto3 found credentials: access_key={_creds.access_key[:10]}...")
+    else:
+        logger.warning("boto3.Session().get_credentials() returned None")
+except Exception as e:
+    logger.error(f"boto3 credential check failed: {e}")
+
 try:
     _client = AnthropicBedrock(aws_region=settings.aws_region)
     logger.info(f"AnthropicBedrock client initialized for region {settings.aws_region}")
@@ -30,6 +48,8 @@ except Exception as e:
 
 
 def client() -> AnthropicBedrock:
+    if _client is None:
+        logger.error("LLM client is None - AnthropicBedrock failed to initialize. Check AWS credentials.")
     return _client
 
 
