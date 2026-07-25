@@ -292,13 +292,17 @@ def c4_narrative(sub: Submission, persona: PersonaInference, sc: Scorecard) -> E
                 f"Recommended next step: {sc.recommended_next_step.body} ({sc.recommended_next_step.duration_estimate_weeks})\n\n"
                 "Write the headline and paragraphs.")
         try:
+            logger.info(f"[C4] Attempting LLM invocation with model {settings.model_opus}")
             r: ExecutiveNarrative = parse_structured(C4_SYS, [{"role": "user", "content": user}],
                                                      ExecutiveNarrative, model=settings.model_opus, max_tokens=4000)
             if r.paragraphs:
                 logger.info(f"[C4] Used LLM for narrative: {len(r.paragraphs)} paragraphs")
                 return r
+            else:
+                logger.warning("[C4] LLM returned empty paragraphs")
         except Exception as e:
-            logger.warning(f"[C4] LLM failed, falling back to deterministic: {e}")
+            logger.error(f"[C4] LLM failed with exception: {type(e).__name__}: {str(e)[:500]}", exc_info=True)
+            logger.warning(f"[C4] Falling back to deterministic mode")
     else:
         logger.info("[C4] LLM not available, using deterministic fallback")
     return _narrative_fallback(sub, persona, sc)
