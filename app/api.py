@@ -83,9 +83,94 @@ class DecisionRequest(BaseModel):
     note: str = ""
 
 
+@app.get("/health")
+def health():
+    """Health check endpoint."""
+    return {"status": "ok"}
+
+
 @app.get("/api/questions")
 def questions():
     return load_question_pool()
+
+
+@app.get("/api/debug")
+def debug_endpoint():
+    """Simple debug endpoint to test if routing works."""
+    return {"status": "debug endpoint working", "test": "123"}
+
+
+@app.get("/api/debug/aws")
+def debug_aws():
+    """Diagnostic endpoint: test AWS credentials and Bedrock connectivity."""
+    import boto3
+    from .config import llm_available, settings
+
+    results = {"test": "starting"}
+
+    # Test 1: Check credentials
+    try:
+        session = boto3.Session()
+        creds = session.get_credentials()
+        if creds:
+            results["credentials"] = {
+                "status": "available",
+                "access_key": creds.access_key[:10] + "..."
+            }
+        else:
+            results["credentials"] = {"status": "not_found"}
+    except Exception as e:
+        results["credentials"] = {"status": "error", "error": str(e)[:100]}
+
+    # Test 2: Check STS
+    try:
+        sts = boto3.client("sts", region_name=settings.aws_region)
+        identity = sts.get_caller_identity()
+        results["caller_identity"] = {
+            "status": "ok",
+            "account": identity.get("Account")
+        }
+    except Exception as e:
+        results["caller_identity"] = {"status": "error", "error": str(e)[:100]}
+
+    # Test 3: List Bedrock models
+    try:
+        bedrock = boto3.client("bedrock", region_name=settings.aws_region)
+        models = bedrock.list_foundation_models()
+        claude_models = [m["modelId"] for m in models.get("modelSummaries", []) if "claude" in m.get("modelId", "").lower()]
+        results["bedrock_models"] = {
+            "status": "ok",
+            "claude_count": len(claude_models),
+            "sample": claude_models[:3] if claude_models else []
+        }
+    except Exception as e:
+        results["bedrock_models"] = {"status": "error", "error": str(e)[:100]}
+
+    # Test 4: Configured models
+    results["config"] = {
+        "opus": settings.model_opus,
+        "sonnet": settings.model_sonnet,
+        "haiku": settings.model_haiku
+    }
+
+    # Test 5: Try model invoke
+    try:
+        from .llm import client
+        llm_client = client()
+        resp = llm_client.messages.create(
+            model=settings.model_haiku,
+            max_tokens=50,
+            messages=[{"role": "user", "content": "Say OK"}]
+        )
+        results["model_invoke"] = {
+            "status": "ok",
+            "response": resp.content[0].text if resp.content else "empty"
+        }
+    except Exception as e:
+        results["model_invoke"] = {"status": "error", "error": str(e)[:150]}
+
+    results["llm_available"] = llm_available()
+    return results
 
 
 @app.get("/api/fixture/{name}")
@@ -243,10 +328,11 @@ def review_page():
 # This ensures routes like /assessment, /scorecard, etc. work with client-side routing
 @app.get("/{path_name:path}", response_class=HTMLResponse)
 def catch_all(path_name: str):
-    # Don't serve index.html for API routes or known paths
-    if path_name.startswith("api/") or path_name.startswith("vendor/") or path_name.startswith("assets/"):
+    # Don't serve index.html for vendor/ or assets/ (static resources)
+    if path_name.startswith("vendor/") or path_name.startswith("assets/"):
         raise HTTPException(404, "Not found")
-    # For all other routes, serve the React app's index.html
+    # API routes that are unknown should 404 (but specific API routes like /api/debug/aws are matched first)
+    # For all other routes, serve the React app's index.html (client-side routing)
     dist_index = ROOT / "web" / "dist" / "index.html"
     if dist_index.exists():
         return HTMLResponse(dist_index.read_text(encoding="utf-8"))
