@@ -21,10 +21,18 @@ except Exception:
 
 def llm_available() -> bool:
     """True when AWS credentials are configured; otherwise the pipeline runs offline."""
+    import logging
+    logger = logging.getLogger(__name__)
     try:
-        boto3.Session().get_credentials()
-        return True
-    except Exception:
+        creds = boto3.Session().get_credentials()
+        if creds:
+            logger.info(f"AWS credentials available: {creds.access_key[:10]}...")
+            return True
+        else:
+            logger.warning("boto3.Session().get_credentials() returned None")
+            return False
+    except Exception as e:
+        logger.error(f"Error checking AWS credentials: {type(e).__name__}: {str(e)[:200]}")
         return False
 
 
@@ -33,10 +41,10 @@ class Settings:
     aws_region: str = os.getenv("AWS_REGION", "us-east-1")
 
     # tiers -> Bedrock model IDs (API format from Bedrock console)
-    model_opus: str = os.getenv("AIDIAG_MODEL_OPUS", "us.anthropic.claude-opus-4-8")
-    model_sonnet: str = os.getenv("AIDIAG_MODEL_SONNET", "us.anthropic.claude-sonnet-5")
-    model_haiku: str = os.getenv("AIDIAG_MODEL_HAIKU", "us.anthropic.claude-haiku-4-5-20251001-v1:0")
-    default_model: str = os.getenv("AIDIAG_MODEL_DEFAULT", "us.anthropic.claude-sonnet-5")
+    model_opus: str = os.getenv("AIDIAG_MODEL_OPUS", "anthropic.claude-opus-4-8-v1:0")
+    model_sonnet: str = os.getenv("AIDIAG_MODEL_SONNET", "anthropic.claude-sonnet-4-5-20250929-v1:0")
+    model_haiku: str = os.getenv("AIDIAG_MODEL_HAIKU", "anthropic.claude-haiku-4-5-20251001-v1:0")
+    default_model: str = os.getenv("AIDIAG_MODEL_DEFAULT", "anthropic.claude-sonnet-4-5-20250929-v1:0")
     effort: str = os.getenv("AIDIAG_EFFORT", "high")
     enable_research: bool = os.getenv("AIDIAG_ENABLE_RESEARCH", "false").lower() == "true"
     sec_user_agent: str = os.getenv("AIDIAG_SEC_USER_AGENT", "DXC AdvisoryX Diagnostic contact@dxc.com")

@@ -13,12 +13,20 @@ from pydantic import BaseModel
 
 from anthropic import AnthropicBedrock
 
-from .config import settings
+from .config import settings, llm_available
 
 T = TypeVar("T", bound=BaseModel)
 
+import logging
+logger = logging.getLogger(__name__)
+
 # Resolves AWS credentials from environment/IAM roles (SigV4).
-_client = AnthropicBedrock(aws_region=settings.aws_region)
+try:
+    _client = AnthropicBedrock(aws_region=settings.aws_region)
+    logger.info(f"AnthropicBedrock client initialized for region {settings.aws_region}")
+except Exception as e:
+    logger.error(f"Failed to initialize AnthropicBedrock: {e}")
+    _client = None
 
 
 def client() -> AnthropicBedrock:
@@ -55,6 +63,10 @@ def parse_structured(
     max_tokens: int = 8000,
 ) -> T:
     """Schema-constrained generation via messages.parse()."""
+    from .config import llm_available
+    import logging
+    logger = logging.getLogger(__name__)
+
     kwargs: dict[str, Any] = dict(
         model=model or settings.default_model,
         max_tokens=max_tokens,
@@ -62,11 +74,18 @@ def parse_structured(
         messages=list(messages),
         output_format=schema,
     )
-    resp = _client.messages.parse(**kwargs)
-    parsed = resp.parsed_output
-    if parsed is None:
-        raise RuntimeError(
-            f"Structured output failed (stop_reason={resp.stop_reason}). "
-            "If refusal, inspect resp.stop_details."
-        )
-    return parsed
+
+    logger.info(f"Invoking Bedrock: model={kwargs['model']}, llm_available={llm_available()}")
+
+    try:
+        resp = _client.messages.parse(**kwargs)
+        parsed = resp.parsed_output
+        if parsed is None:
+            raise RuntimeError(
+                f"Structured output failed (stop_reason={resp.stop_reason}). "
+                "If refusal, inspect resp.stop_details."
+            )
+        return parsed
+    except Exception as e:
+        logger.error(f"Bedrock invoke failed: {type(e).__name__}: {str(e)[:500]}")
+        raise
