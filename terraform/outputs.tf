@@ -18,10 +18,11 @@ output "dynamodb_table_name" {
   value       = aws_dynamodb_table.sessions.name
 }
 
-output "cloudwatch_log_group" {
-  description = "CloudWatch log group name"
-  value       = aws_cloudwatch_log_group.ecs.name
-}
+# Disabled - log group managed externally
+# output "cloudwatch_log_group" {
+#   description = "CloudWatch log group name"
+#   value       = aws_cloudwatch_log_group.ecs.name
+# }
 
 output "task_role_arn" {
   description = "IAM task role ARN"

@@ -1,4 +1,4 @@
-anthropic>=0.92.0  # AnthropicBedrock for AWS Bedrock access (SigV4 auth, no API key)
+anthropic>=0.98.0  # AnthropicBedrock for AWS Bedrock access (SigV4 auth, no API key)
 pydantic>=2.6
 PyYAML>=6.0
 python-dotenv>=1.0

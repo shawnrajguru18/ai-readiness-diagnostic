@@ -1,4 +1,20 @@
-# DXC AI Readiness Diagnostic — FastAPI app (as-built, container target)
+# DXC AI Readiness Diagnostic — FastAPI app with React UI (multi-stage build)
+
+# Stage 1: Build the React UI with Node
+FROM node:18-alpine AS ui-builder
+WORKDIR /ui
+COPY web/package*.json ./
+RUN npm install --frozen-lockfile
+# Copy source files needed for build
+COPY web/src ./src
+COPY web/tsconfig.json ./
+COPY web/vite.config.ts ./
+COPY web/tailwind.config.js ./
+COPY web/postcss.config.js ./
+COPY web/index.html ./
+RUN npm run build
+
+# Stage 2: Python FastAPI with built UI
 FROM python:3.12-slim
 
 ENV PYTHONUNBUFFERED=1 \
@@ -10,13 +26,20 @@ WORKDIR /app
 # Install curl for health checks
 RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
 
-# Deps first for layer caching. reportlab/svglib/lxml ship manylinux wheels,
-# so no apt build toolchain is needed on slim.
+# Python dependencies first for layer caching
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# App + content/fixtures/web/logo (relative paths are resolved from repo root)
-COPY . .
+# Copy app code + content/fixtures (FastAPI backend)
+COPY app ./app
+COPY content ./content
+
+# Copy built React UI from stage 1
+COPY --from=ui-builder /ui/dist ./web/dist
+
+# Copy vendor libs and review.html for partner dashboard
+COPY web/vendor ./web/vendor
+COPY web/review.html ./web/review.html
 
 EXPOSE 8080
 

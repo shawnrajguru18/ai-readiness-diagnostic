@@ -41,6 +41,12 @@ _VENDOR = ROOT / "web" / "vendor"
 if _VENDOR.is_dir():
     app.mount("/vendor", StaticFiles(directory=str(_VENDOR)), name="vendor")
 
+# Serve built React UI from dist/ folder (created by npm run build)
+_DIST = ROOT / "web" / "dist"
+if _DIST.is_dir():
+    # Mount dist/assets as /assets (for CSS/JS bundles with cache-busting hashes)
+    app.mount("/assets", StaticFiles(directory=str(_DIST / "assets")), name="assets")
+
 def _serialize(session: Session) -> dict[str, Any]:
     sc = session.scorecard
     d = sc.model_dump()
@@ -221,9 +227,27 @@ def _page(name: str) -> HTMLResponse:
 
 @app.get("/", response_class=HTMLResponse)
 def index():
+    # Serve from dist/ if it exists (built React app), otherwise fallback to old web/index.html
+    dist_index = ROOT / "web" / "dist" / "index.html"
+    if dist_index.exists():
+        return HTMLResponse(dist_index.read_text(encoding="utf-8"))
     return _page("index.html")
 
 
 @app.get("/review", response_class=HTMLResponse)
 def review_page():
     return _page("review.html")
+
+
+# Catch-all for React Router (SPA routing): serve index.html for unknown routes
+# This ensures routes like /assessment, /scorecard, etc. work with client-side routing
+@app.get("/{path_name:path}", response_class=HTMLResponse)
+def catch_all(path_name: str):
+    # Don't serve index.html for API routes or known paths
+    if path_name.startswith("api/") or path_name.startswith("vendor/") or path_name.startswith("assets/"):
+        raise HTTPException(404, "Not found")
+    # For all other routes, serve the React app's index.html
+    dist_index = ROOT / "web" / "dist" / "index.html"
+    if dist_index.exists():
+        return HTMLResponse(dist_index.read_text(encoding="utf-8"))
+    return _page("index.html")

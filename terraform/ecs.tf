@@ -10,25 +10,28 @@ resource "aws_ecs_cluster" "main" {
   tags = local.tags
 }
 
-resource "aws_ecs_cluster_capacity_providers" "main" {
-  cluster_name = aws_ecs_cluster.main.name
-
-  capacity_providers = ["FARGATE", "FARGATE_SPOT"]
-
-  default_capacity_provider_strategy {
-    base              = 1
-    weight            = 100
-    capacity_provider = "FARGATE"
-  }
-}
+# Disabled - capacity providers not required for basic service creation
+# If needed later, add via AWS console or with updated IAM permissions
+# resource "aws_ecs_cluster_capacity_providers" "main" {
+#   cluster_name = aws_ecs_cluster.main.name
+#
+#   capacity_providers = ["FARGATE", "FARGATE_SPOT"]
+#
+#   default_capacity_provider_strategy {
+#     base              = 1
+#     weight            = 100
+#     capacity_provider = "FARGATE"
+#   }
+# }
 
 # CloudWatch Log Group for ECS
-resource "aws_cloudwatch_log_group" "ecs" {
-  name              = "/ecs/${local.app_name}"
-  retention_in_days = 7
-
-  tags = local.tags
-}
+# Temporarily disabled due to policy constraints - log group will be created manually or via console
+# resource "aws_cloudwatch_log_group" "ecs" {
+#   name              = "/ecs/${local.app_name}"
+#   retention_in_days = 7
+#
+#   tags = local.tags
+# }
 
 # ECS Task Definition
 resource "aws_ecs_task_definition" "app" {
@@ -53,7 +56,7 @@ resource "aws_ecs_task_definition" "app" {
     logConfiguration = {
       logDriver = "awslogs"
       options = {
-        "awslogs-group"         = aws_cloudwatch_log_group.ecs.name
+        "awslogs-group"         = "/ecs/ai-readiness-diagnostic"
         "awslogs-region"        = var.aws_region
         "awslogs-stream-prefix" = "ecs"
       }
@@ -115,7 +118,6 @@ resource "aws_ecs_service" "app" {
   tags = local.tags
 
   depends_on = [
-    aws_ecs_cluster_capacity_providers.main,
     aws_iam_role_policy.task_role_dynamodb,
     aws_iam_role_policy.task_role_bedrock
   ]
