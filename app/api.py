@@ -36,6 +36,11 @@ WEB = ROOT / "web"
 app = FastAPI(title="DXC AI Readiness Diagnostic", version="0.2")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
+# Ultra-simple test route - no imports, no logic, pure return
+@app.get("/ping")
+def ping():
+    return {"ping": "pong"}
+
 # Serve vendored front-end libs (React/ReactDOM/Babel/Tailwind) locally — no external CDN.
 _VENDOR = ROOT / "web" / "vendor"
 if _VENDOR.is_dir():
