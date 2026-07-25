@@ -70,6 +70,10 @@ resource "aws_ecs_task_definition" "app" {
       {
         name  = "AWS_REGION"
         value = var.aws_region
+      },
+      {
+        name  = "AIDIAG_FORCE_LLM"
+        value = "true"
       }
     ]
 

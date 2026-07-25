@@ -23,6 +23,13 @@ def llm_available() -> bool:
     """True when AWS credentials are configured; otherwise the pipeline runs offline."""
     import logging
     logger = logging.getLogger(__name__)
+
+    # Force LLM if environment variable is set (for debugging)
+    force_llm = os.getenv("AIDIAG_FORCE_LLM", "false").lower() == "true"
+    if force_llm:
+        logger.warning("AIDIAG_FORCE_LLM is set - forcing LLM invocation regardless of credential check")
+        return True
+
     try:
         creds = boto3.Session().get_credentials()
         if creds:
