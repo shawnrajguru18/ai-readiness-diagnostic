@@ -1,21 +1,34 @@
-# Secrets
-.env
+﻿# Docker artifacts
+image.tar
+*.tar
+*.tar.gz
+
+# Node dependencies
+node_modules/
+web/dist/
+web/node_modules/
 
 # Python
 __pycache__/
-*.py[cod]
+*.pyc
+*.pyo
 .venv/
 venv/
-*.egg-info/
-.pytest_cache/
 
-# Generated artifacts
-outputs/
-*.pdf
+# IDE
+.vscode/
+.idea/
+*.swp
 
-# OS / editor
+# OS
 .DS_Store
 Thumbs.db
 
-# Env files (keep any keys out of git)
-.env.*
+# Terraform
+terraform/.terraform/
+terraform/*.tfstate*
+terraform/.terraform.lock.hcl
+
+# Env files
+.env
+.env.local
