@@ -28,3 +28,10 @@ max_capacity       = 3
 # If you have IAM permission issues, provide these explicitly:
 # vpc_id    = "vpc-12345678"
 # subnet_ids = ["subnet-11111111", "subnet-22222222"]
+
+# Bedrock API Key and Endpoint (REQUIRED for LLM to work)
+# 1. Go to AWS Console → Bedrock → API keys
+# 2. Create a new API key
+# 3. Copy the key and set it below
+# anthropic_api_key = "your-bedrock-api-key-here"
+# anthropic_base_url = "https://bedrock-mantle.us-east-1.api.aws/anthropic"

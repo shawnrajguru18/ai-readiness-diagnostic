@@ -62,20 +62,34 @@ resource "aws_ecs_task_definition" "app" {
       }
     }
 
-    environment = [
-      {
-        name  = "AIDIAG_DDB_TABLE"
-        value = aws_dynamodb_table.sessions.name
-      },
-      {
-        name  = "AWS_REGION"
-        value = var.aws_region
-      },
-      {
-        name  = "AIDIAG_FORCE_LLM"
-        value = "true"
-      }
-    ]
+    environment = concat(
+      [
+        {
+          name  = "AIDIAG_DDB_TABLE"
+          value = aws_dynamodb_table.sessions.name
+        },
+        {
+          name  = "AWS_REGION"
+          value = var.aws_region
+        },
+        {
+          name  = "AIDIAG_FORCE_LLM"
+          value = "true"
+        }
+      ],
+      var.anthropic_api_key != "" ? [
+        {
+          name  = "ANTHROPIC_API_KEY"
+          value = var.anthropic_api_key
+        }
+      ] : [],
+      var.anthropic_base_url != "" ? [
+        {
+          name  = "ANTHROPIC_BASE_URL"
+          value = var.anthropic_base_url
+        }
+      ] : []
+    )
 
     healthCheck = {
       command = [

@@ -5,45 +5,41 @@ Two entry points:
   - parse_structured(...)     schema-constrained output via messages.parse() (capture, scoring, probe)
 
 Defaults to adaptive thinking (recommended for Claude 4.6+) and effort=high.
-Uses AWS Bedrock for Claude access (SigV4 auth via IAM, no API key needed).
+Uses AWS Bedrock for Claude access via Bedrock API key + Mantle endpoint.
 """
 from __future__ import annotations
 from typing import Any, Sequence, Type, TypeVar
 from pydantic import BaseModel
-import boto3
+import os
+import logging
 
-from anthropic import AnthropicBedrock
+from anthropic import Anthropic
 
 from .config import settings, llm_available
 
 T = TypeVar("T", bound=BaseModel)
-
-import logging
 logger = logging.getLogger(__name__)
 
-# Resolves AWS credentials from environment/IAM roles (SigV4).
-import os
-import sys
-_aws_key = os.environ.get("AWS_ACCESS_KEY_ID", "not set")
-_aws_secret = os.environ.get("AWS_SECRET_ACCESS_KEY", "not set")
-_aws_session = os.environ.get("AWS_SESSION_TOKEN", "not set")
-_env_summary = f"Key={_aws_key[:10] if _aws_key != 'not set' else 'not set'}..., Secret set={_aws_secret != 'not set'}, Session set={_aws_session != 'not set'}"
-logger.info(f"Environment credentials: {_env_summary}")
+# Check for Bedrock API key (required for Mantle endpoint)
+_api_key = os.environ.get("ANTHROPIC_API_KEY")
+_base_url = os.environ.get("ANTHROPIC_BASE_URL")
+_aws_region = os.environ.get("AWS_REGION", settings.aws_region)
+
+if _api_key:
+    logger.info(f"Using Bedrock API key authentication with base_url: {_base_url}")
+else:
+    logger.warning("ANTHROPIC_API_KEY not set - LLM calls will fail. Set it in environment variables.")
+
+# Build base_url if not explicitly set
+if not _base_url and _api_key:
+    _base_url = f"https://bedrock-mantle.{_aws_region}.api.aws/anthropic"
+    logger.info(f"Constructed base_url: {_base_url}")
 
 try:
-    _creds = boto3.Session().get_credentials()
-    if _creds:
-        logger.info(f"boto3 found credentials: access_key={_creds.access_key[:10]}...")
-    else:
-        logger.warning("boto3.Session().get_credentials() returned None")
+    _client = Anthropic(api_key=_api_key or "", base_url=_base_url)
+    logger.info(f"Anthropic client initialized with Bedrock Mantle endpoint")
 except Exception as e:
-    logger.error(f"boto3 credential check failed: {e}")
-
-try:
-    _client = AnthropicBedrock(aws_region=settings.aws_region)
-    logger.info(f"AnthropicBedrock client initialized for region {settings.aws_region}")
-except Exception as e:
-    logger.error(f"Failed to initialize AnthropicBedrock: {e}")
+    logger.error(f"Failed to initialize Anthropic client: {e}")
     _client = None
 
 

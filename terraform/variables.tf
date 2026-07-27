@@ -75,3 +75,16 @@ variable "subnet_ids" {
   type        = list(string)
   default     = []
 }
+
+variable "anthropic_api_key" {
+  description = "AWS Bedrock API key (generate in AWS Console → Bedrock → API keys)"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "anthropic_base_url" {
+  description = "Bedrock Mantle endpoint URL (e.g., https://bedrock-mantle.us-east-1.api.aws/anthropic)"
+  type        = string
+  default     = ""
+}
