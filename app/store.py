@@ -108,6 +108,20 @@ class _DynamoStore:
 
 # ---------- module-level singleton ----------
 _TABLE = os.getenv("AIDIAG_DDB_TABLE")
-store: Any = _DynamoStore(_TABLE) if _TABLE else _MemoryStore()
 
+# Lazy initialization: defer DynamoDB setup until first use to avoid import-time failures
+_store_instance = None
+
+def _init_store():
+    global _store_instance
+    if _store_instance is None:
+        _store_instance = _DynamoStore(_TABLE) if _TABLE else _MemoryStore()
+    return _store_instance
+
+class _LazyStore:
+    """Wrapper that initializes the real store on first access."""
+    def __getattr__(self, name):
+        return getattr(_init_store(), name)
+
+store: Any = _LazyStore()
 backend = "dynamodb" if _TABLE else "memory"

@@ -43,9 +43,9 @@ except Exception as e:
     _client = None
 
 
-def client() -> AnthropicBedrock:
+def client() -> Anthropic | None:
     if _client is None:
-        logger.error("LLM client is None - AnthropicBedrock failed to initialize. Check AWS credentials.")
+        logger.error("LLM client is None - Anthropic client failed to initialize. Check AWS credentials.")
     return _client
 
 
