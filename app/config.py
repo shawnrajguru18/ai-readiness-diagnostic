@@ -25,7 +25,9 @@ def llm_available() -> bool:
     logger = logging.getLogger(__name__)
 
     # Force LLM if environment variable is set (for debugging)
-    force_llm = os.getenv("AIDIAG_FORCE_LLM", "false").lower() == "true"
+    force_llm_env = os.getenv("AIDIAG_FORCE_LLM", "false")
+    force_llm = force_llm_env.lower() == "true"
+    print(f"[DEBUG_CONFIG] AIDIAG_FORCE_LLM={force_llm_env!r} -> {force_llm}")
     if force_llm:
         logger.warning("AIDIAG_FORCE_LLM is set - forcing LLM invocation regardless of credential check")
         return True

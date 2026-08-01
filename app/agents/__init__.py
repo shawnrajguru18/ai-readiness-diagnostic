@@ -46,7 +46,9 @@ A2_SYS = (
 )
 
 def a2_persona(sub: Submission, hint: str | None = None) -> PersonaInference:
-    if llm_available():
+    llm_ok = llm_available()
+    print(f"[DEBUG_A2] llm_available()={llm_ok}")
+    if llm_ok:
         from ..llm import parse_structured
         user = (f"Name: {sub.prospect_name}\nRole: {sub.prospect_role}\nCompany: {sub.company_name_raw}\n"
                 f"Industry: {sub.industry_label}\nEmail domain: {sub.prospect_email.split('@')[-1]}")
@@ -281,7 +283,9 @@ def _peer_overall_graded(sc: Scorecard, graded: list[DimensionScore]):
 
 
 def c4_narrative(sub: Submission, persona: PersonaInference, sc: Scorecard) -> ExecutiveNarrative:
-    if llm_available():
+    llm_ok = llm_available()
+    print(f"[DEBUG_C4] llm_available()={llm_ok}, company={sc.company_name}")
+    if llm_ok:
         from ..llm import parse_structured
         user = (f"Prospect: {sc.company_name} | Industry: {sc.industry_label} | "
                 f"Primary persona: {persona.primary_persona} ({persona.framing_preference})\n\n"
