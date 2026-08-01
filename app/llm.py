@@ -78,30 +78,50 @@ def parse_structured(
     thinking: bool = True,
     max_tokens: int = 8000,
 ) -> T:
-    """Schema-constrained generation via messages.parse()."""
+    """Schema-constrained generation via tool-based enforcement (Bedrock-compatible)."""
     from .config import llm_available
+    import json
     import logging
     logger = logging.getLogger(__name__)
 
-    kwargs: dict[str, Any] = dict(
-        model=model or settings.default_model,
-        max_tokens=max_tokens,
-        system=system,
-        messages=list(messages),
-        output_format=schema,
-    )
-
-    logger.info(f"Invoking Bedrock: model={kwargs['model']}, llm_available={llm_available()}")
+    logger.info(f"Invoking Bedrock: model={model or settings.default_model}, llm_available={llm_available()}")
 
     try:
-        resp = _client.messages.parse(**kwargs)
-        parsed = resp.parsed_output
-        if parsed is None:
-            raise RuntimeError(
-                f"Structured output failed (stop_reason={resp.stop_reason}). "
-                "If refusal, inspect resp.stop_details."
-            )
-        return parsed
+        # Convert Pydantic schema to tool definition
+        schema_dict = schema.model_json_schema()
+        tool_def = {
+            "name": "output_schema",
+            "description": f"Structured output conforming to {schema.__name__}",
+            "input_schema": {
+                "type": "object",
+                "properties": schema_dict.get("properties", {}),
+                "required": schema_dict.get("required", list(schema_dict.get("properties", {}).keys())),
+            }
+        }
+
+        # Call with tool enforcement (Bedrock-compatible)
+        resp = _client.messages.create(
+            model=model or settings.default_model,
+            max_tokens=max_tokens,
+            system=system,
+            messages=list(messages),
+            tools=[tool_def],
+            tool_choice={"type": "tool", "name": "output_schema"},
+        )
+
+        # Extract JSON from tool call
+        if resp.stop_reason != "tool_use":
+            raise RuntimeError(f"Expected tool_use stop reason, got {resp.stop_reason}")
+
+        tool_call = next((b for b in resp.content if b.type == "tool_use"), None)
+        if not tool_call:
+            raise RuntimeError("No tool_use block found in response")
+
+        # Parse and validate
+        parsed_data = schema.model_validate(tool_call.input)
+        logger.info(f"Structured output succeeded via tool_use")
+        return parsed_data
+
     except Exception as e:
-        logger.error(f"Bedrock invoke failed: {type(e).__name__}: {str(e)[:500]}")
+        logger.error(f"Bedrock structured invoke failed: {type(e).__name__}: {str(e)[:500]}")
         raise
