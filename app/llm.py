@@ -49,6 +49,37 @@ def client() -> Anthropic | None:
     return _client
 
 
+def _remediate_payload(data: dict) -> dict:
+    """Fix common hallucinations and missing fields before Pydantic validation."""
+    import copy
+    remediated = copy.deepcopy(data)
+
+    # Fix missing confidence in dimension_reasoning
+    if "dimension_reasoning" in remediated and isinstance(remediated["dimension_reasoning"], list):
+        for item in remediated["dimension_reasoning"]:
+            if "confidence" not in item:
+                item["confidence"] = 1.0
+
+    # Fix missing/malformed fields in findings
+    if "findings" in remediated and isinstance(remediated["findings"], list):
+        for idx, item in enumerate(remediated["findings"]):
+            # Remap 'title' to 'headline' if needed
+            if "title" in item and "headline" not in item:
+                item["headline"] = item.pop("title")
+
+            # Ensure all required fields exist with safe defaults
+            if "finding_id" not in item:
+                item["finding_id"] = f"finding_{idx}"
+            if "headline" not in item:
+                item["headline"] = "Finding"
+            if "decision_relevance" not in item:
+                item["decision_relevance"] = "Medium"
+            if "confidence" not in item:
+                item["confidence"] = 1.0
+
+    return remediated
+
+
 def complete_text(
     system: str,
     messages: Sequence[dict[str, Any]],
@@ -89,14 +120,23 @@ def parse_structured(
     try:
         # Convert Pydantic schema to tool definition
         schema_dict = schema.model_json_schema()
+
+        # Extract just the parts we need for the tool input schema
+        # Include all properties and required fields from the main schema
+        input_schema = {
+            "type": "object",
+            "properties": schema_dict.get("properties", {}),
+            "required": schema_dict.get("required", []),
+        }
+
+        # If there are definitions (nested models), include them for full JSON Schema validation
+        if "$defs" in schema_dict:
+            input_schema["$defs"] = schema_dict["$defs"]
+
         tool_def = {
             "name": "output_schema",
-            "description": f"Structured output conforming to {schema.__name__}",
-            "input_schema": {
-                "type": "object",
-                "properties": schema_dict.get("properties", {}),
-                "required": schema_dict.get("required", list(schema_dict.get("properties", {}).keys())),
-            }
+            "description": f"Structured output conforming to {schema.__name__}. ALL fields marked as required must be included in the response.",
+            "input_schema": input_schema
         }
 
         # Call with tool enforcement (Bedrock-compatible)
@@ -117,8 +157,11 @@ def parse_structured(
         if not tool_call:
             raise RuntimeError("No tool_use block found in response")
 
+        # Remediate common hallucinations before validation
+        remediated = _remediate_payload(tool_call.input)
+
         # Parse and validate
-        parsed_data = schema.model_validate(tool_call.input)
+        parsed_data = schema.model_validate(remediated)
         logger.info(f"Structured output succeeded via tool_use")
         return parsed_data
 
