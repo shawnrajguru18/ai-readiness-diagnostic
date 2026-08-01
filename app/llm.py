@@ -37,9 +37,11 @@ if not _base_url and _api_key:
 
 try:
     _client = Anthropic(api_key=_api_key or "", base_url=_base_url)
-    logger.info(f"Anthropic client initialized with Bedrock Mantle endpoint")
+    logger.info(f"✓ Anthropic client initialized with Bedrock Mantle endpoint")
+    print(f"[LLM_INIT] ✓ Client initialized successfully")
 except Exception as e:
-    logger.error(f"Failed to initialize Anthropic client: {e}")
+    logger.error(f"✗ Failed to initialize Anthropic client: {e}")
+    print(f"[LLM_INIT] ✗ Client initialization FAILED: {type(e).__name__}: {e}")
     _client = None
 
 

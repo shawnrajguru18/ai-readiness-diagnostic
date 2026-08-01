@@ -45,4 +45,4 @@ EXPOSE 8080
 
 # App Runner / ECS route traffic to $PORT (defaults to 8080 here).
 # Credentials (Bedrock, DynamoDB) resolved from environment or IAM instance role (SigV4).
-CMD ["sh", "-c", "uvicorn app.api:app --host 0.0.0.0 --port ${PORT:-8080}"]
+CMD ["sh", "-c", "uvicorn app.api:app --host 0.0.0.0 --port ${PORT:-8080} --log-level info"]
