@@ -56,6 +56,20 @@ def _remediate_payload(data: dict) -> dict:
     import copy
     remediated = copy.deepcopy(data)
 
+    # Fix paragraphs: Claude often returns a single string instead of list
+    if "paragraphs" in remediated and isinstance(remediated["paragraphs"], str):
+        # Split on newlines or period+newline, but keep non-empty paragraphs
+        text = remediated["paragraphs"]
+        # Try splitting on double newline first (most natural)
+        if "\n\n" in text:
+            remediated["paragraphs"] = [p.strip() for p in text.split("\n\n") if p.strip()]
+        # Fall back to single newline
+        elif "\n" in text:
+            remediated["paragraphs"] = [p.strip() for p in text.split("\n") if p.strip()]
+        # If no newlines, treat the whole thing as one paragraph
+        else:
+            remediated["paragraphs"] = [text.strip()] if text.strip() else []
+
     # Fix missing confidence in dimension_reasoning
     if "dimension_reasoning" in remediated and isinstance(remediated["dimension_reasoning"], list):
         for item in remediated["dimension_reasoning"]:
