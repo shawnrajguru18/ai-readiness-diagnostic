@@ -404,3 +404,124 @@ def d2_validate(scorecard) -> ValidationOutput:
     status = "requires_revision" if crit else ("passed_with_flags" if flags else "passed")
     prio = "expedited" if crit else "standard"
     return ValidationOutput(overall_status=status, flags=flags, partner_review_priority=prio)
+
+
+# ======================================================================
+# Voice Interview Scoring (Companion 04 Voice)
+# ======================================================================
+VOICE_SCORING_SYS = (
+    "You are a dimension scorer for the DXC AI Readiness Diagnostic. You are given open-ended voice "
+    "interview answers across 6 dimensions: Data Foundation, Governance & Risk, Investment & Culture, "
+    "Skills & Execution, Market Advantage, and Regulatory Complexity (informational). Score each "
+    "dimension 0-100 based on the responses. Emerging 0-39 / Developing 40-59 / Established 60-79 / "
+    "Leading 80-100. Be specific: cite the response that drove each score. Return JSON only with "
+    "dimension scores and reasoning."
+)
+
+def score_from_voice(sub: Submission, persona: PersonaInference,
+                     voice_responses: dict[str, Any]) -> list[DimensionScore]:
+    """Score dimensions from open-ended voice interview answers using LLM."""
+    llm_ok = llm_available()
+    print(f"[DEBUG_VOICE] llm_available()={llm_ok}")
+
+    if llm_ok:
+        from ..llm import client as get_llm_client
+        from ..models import DimensionScore
+
+        # Format voice answers for the LLM
+        answer_text = "\n".join(
+            f"Q: {q}\nA: {a.get('text', '')}".strip()
+            for q, a in voice_responses.items()
+        )
+
+        user_prompt = f"""Company: {sub.company_name_raw}
+Industry: {sub.industry_label}
+Persona: {persona.primary_persona}
+
+Voice Interview Responses:
+{answer_text}
+
+Score each AI readiness dimension (0-100). Be specific and cite the response that drove your assessment."""
+
+        try:
+            llm_client = get_llm_client()
+            resp = llm_client.messages.create(
+                model=settings.model_opus,
+                max_tokens=1500,
+                system=VOICE_SCORING_SYS,
+                messages=[{"role": "user", "content": user_prompt}]
+            )
+
+            # Parse LLM response
+            content = resp.content[0].text if resp.content else "{}"
+            try:
+                data = json.loads(content)
+            except json.JSONDecodeError:
+                # Try to extract JSON from the response
+                import re
+                match = re.search(r'\{.*\}', content, re.DOTALL)
+                data = json.loads(match.group(0)) if match else {}
+
+            # Build dimension scores from LLM response
+            dims = []
+            dimension_names = [
+                ("data_foundation", "Data Foundation"),
+                ("governance_risk", "Governance & Risk"),
+                ("investment_culture", "Investment & Culture"),
+                ("skills_execution", "Skills & Execution"),
+                ("market_advantage", "Market Advantage"),
+                ("regulatory_complexity", "Regulatory Complexity"),
+            ]
+
+            for dim_key, dim_label in dimension_names:
+                score_val = data.get(dim_key, {}).get("score", 50)
+                if isinstance(score_val, str):
+                    score_val = int(''.join(c for c in score_val if c.isdigit()) or "50")
+                score_val = max(0, min(100, int(score_val)))
+
+                reasoning = data.get(dim_key, {}).get("reasoning", "Based on voice interview responses.")
+                is_informational = dim_key == "regulatory_complexity"
+
+                dims.append(DimensionScore(
+                    dimension=dim_key,
+                    label=dim_label,
+                    score=score_val,
+                    tier="Informational" if is_informational else
+                         ("Emerging" if score_val < 40 else
+                          "Developing" if score_val < 60 else
+                          "Established" if score_val < 80 else "Leading"),
+                    reasoning=reasoning,
+                    confidence=0.75,
+                    informational=is_informational
+                ))
+
+            logger.info(f"[VOICE] Scored {len(dims)} dimensions from voice interview")
+            return dims
+
+        except Exception as e:
+            print(f"[DEBUG_VOICE] ✗ EXCEPTION: {type(e).__name__}: {str(e)[:200]}")
+            logger.warning(f"[VOICE] LLM failed, falling back to default scores: {e}")
+
+    # Fallback: return neutral scores
+    logger.info("[VOICE] Using fallback neutral scores")
+    dimension_names = [
+        ("data_foundation", "Data Foundation"),
+        ("governance_risk", "Governance & Risk"),
+        ("investment_culture", "Investment & Culture"),
+        ("skills_execution", "Skills & Execution"),
+        ("market_advantage", "Market Advantage"),
+        ("regulatory_complexity", "Regulatory Complexity"),
+    ]
+
+    return [
+        DimensionScore(
+            dimension=dim_key,
+            label=dim_label,
+            score=50,
+            tier="Informational" if dim_key == "regulatory_complexity" else "Developing",
+            reasoning="Default score from voice interview (LLM unavailable).",
+            confidence=0.5,
+            informational=dim_key == "regulatory_complexity"
+        )
+        for dim_key, dim_label in dimension_names
+    ]

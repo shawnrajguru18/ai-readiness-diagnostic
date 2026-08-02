@@ -80,6 +80,7 @@ class AssessRequest(BaseModel):
     submission: dict
     consent: dict = {}
     responses: dict = {}
+    voice_responses: dict = {}  # Open-ended voice interview answers
     persona_hint: Optional[str] = None
 
 
@@ -195,7 +196,7 @@ def fixture(name: str):
 @app.post("/api/assess")
 def assess(req: AssessRequest):
     session, hint = build_session(req.submission, req.consent, req.responses, req.persona_hint)
-    run_pipeline(session, persona_hint=hint)
+    run_pipeline(session, persona_hint=hint, voice_responses=req.voice_responses)
     sid = _store(session)
     out = dict(_serialize(session)); out["id"] = sid
     return JSONResponse(out)

@@ -66,7 +66,8 @@ def build_session(submission: dict, consent: dict, responses: dict,
 
 
 def run_pipeline(session: Session, persona_hint: Optional[str] = None,
-                 assessment_date: Optional[str] = None, log=lambda *_: None) -> Session:
+                 assessment_date: Optional[str] = None, voice_responses: dict = None,
+                 log=lambda *_: None) -> Session:
     sub = session.submission
 
     # A1 — intake/consent gate
@@ -86,9 +87,15 @@ def run_pipeline(session: Session, persona_hint: Optional[str] = None,
         session.research = research
         log("[B1/B2] " + research_mod.research_summary(research))
 
-    # Deterministic dimension scoring (Companion 01)
-    dims = score_dimensions(session.responses)
-    log("[score] " + ", ".join(f"{d.dimension}={d.score}" for d in dims))
+    # Dimension scoring: from structured Q&A or voice interview
+    if voice_responses:
+        # Score from voice interview answers using LLM
+        dims = agents.score_from_voice(sub, session.persona, voice_responses)
+        log("[voice-score] " + ", ".join(f"{d.dimension}={d.score}" for d in dims))
+    else:
+        # Deterministic dimension scoring from structured responses (Companion 01)
+        dims = score_dimensions(session.responses)
+        log("[score] " + ", ".join(f"{d.dimension}={d.score}" for d in dims))
 
     # C2 — synthesis (findings, recommendation, optional research adjustments)
     findings, rec, adjustments, attn = agents.c2_synthesis(sub, session.persona, dims, research)

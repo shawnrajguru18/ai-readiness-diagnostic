@@ -53,13 +53,39 @@ export function App() {
 
   const voiceFinish = (answers: Record<string, Answer>) => {
     if (answers && Object.keys(answers).length) {
-      submit(answers)
+      submitVoice(answers)
     } else {
       alert(
         "No answers were captured by voice yet — let's finish in chat so we can generate your scorecard."
       )
       setScreen(pool ? 'assessment' : 'landing')
     }
+  }
+
+  const submitVoice = (voiceAnswers: Record<string, Answer>) => {
+    setIsSubmitting(true)
+    const body = {
+      submission: ctx.f,
+      consent: { c1_use_for_scorecard: true, ...(ctx.c || {}) },
+      responses: {}, // No structured responses for voice
+      voice_responses: voiceAnswers, // Send voice answers separately
+      persona_hint: null,
+    }
+    fetch(API + '/api/assess', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+      .then((r) => r.json())
+      .then((d) => {
+        setSc(d)
+        setScreen('submitted')
+      })
+      .catch(() => {
+        setSc(DEMO_SCORECARD)
+        setScreen('submitted')
+      })
+      .finally(() => setIsSubmitting(false))
   }
 
   const submit = (answers: Record<string, Answer>) => {
