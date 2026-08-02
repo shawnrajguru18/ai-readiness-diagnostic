@@ -9,6 +9,7 @@ interface AssessmentProps {
   onSubmit: (answers: Record<string, Answer>) => void
   onBack: () => void
   onVoice?: (answers: Record<string, Answer>) => void
+  isSubmitting?: boolean
 }
 
 export function Assessment({
@@ -17,6 +18,7 @@ export function Assessment({
   onSubmit,
   onBack,
   onVoice,
+  isSubmitting = false,
 }: AssessmentProps) {
   const all = pool?.questions || []
   const dimLabels = pool?.dimensions || {}
@@ -196,11 +198,18 @@ export function Assessment({
           )}
         </div>
         <div className="flex justify-between mt-10 pb-16">
-          <Btn kind="ghost" onClick={() => (i === 0 ? onBack() : setI(i - 1))}>
+          <Btn kind="ghost" onClick={() => (i === 0 ? onBack() : setI(i - 1))} disabled={isSubmitting}>
             ← Back
           </Btn>
-          <Btn onClick={next} disabled={!answered()}>
-            {i + 1 >= total ? 'Submit assessment' : 'Next →'}
+          <Btn onClick={next} disabled={!answered() || isSubmitting}>
+            {isSubmitting && i + 1 >= total ? (
+              <span className="flex items-center gap-2">
+                <span className="inline-block w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin"></span>
+                Generating scorecard...
+              </span>
+            ) : (
+              i + 1 >= total ? 'Submit assessment' : 'Next →'
+            )}
           </Btn>
         </div>
       </div>

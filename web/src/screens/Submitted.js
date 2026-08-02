@@ -2,7 +2,7 @@ import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import { Wordmark } from '@/components/Wordmark';
 import { Btn } from '@/components/Btn';
 export function Submitted({ company, email, onView }) {
-    return (_jsxs("div", { className: "min-h-screen bg-canvas flex flex-col", children: [_jsx("div", { className: "max-w-3xl mx-auto w-full px-6 py-6", children: _jsx(Wordmark, {}) }), _jsxs("div", { className: "max-w-2xl mx-auto px-6 flex-1 flex flex-col justify-center pb-24 fade", children: [_jsx("div", { className: "w-12 h-12 rounded-full border-2 border-royal border-t-transparent spin mb-8" }), _jsx("h1", { className: "display text-4xl font-bold", children: "Your assessment is submitted." }), _jsx("p", { className: "text-ink mt-3", children: "Here is what happens next." }), _jsx("ol", { className: "mt-8 space-y-4", children: [
+    return (_jsxs("div", { className: "min-h-screen bg-canvas flex flex-col", children: [_jsx("div", { className: "max-w-3xl mx-auto w-full px-6 py-6", children: _jsx(Wordmark, {}) }), _jsxs("div", { className: "max-w-2xl mx-auto px-6 flex-1 flex flex-col justify-center pb-24 fade", children: [_jsx("h1", { className: "display text-4xl font-bold", children: "Your assessment is submitted." }), _jsx("p", { className: "text-ink mt-3", children: "Here is what happens next." }), _jsx("ol", { className: "mt-8 space-y-4", children: [
                             `AI agents research ${company || 'your company'} — financials, news, tech posture`,
                             'Our synthesis engine scores your readiness across six dimensions',
                             'A DXC senior partner reviews and approves your scorecard',

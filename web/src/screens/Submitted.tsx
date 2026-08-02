@@ -14,7 +14,6 @@ export function Submitted({ company, email, onView }: SubmittedProps) {
         <Wordmark />
       </div>
       <div className="max-w-2xl mx-auto px-6 flex-1 flex flex-col justify-center pb-24 fade">
-        <div className="w-12 h-12 rounded-full border-2 border-royal border-t-transparent spin mb-8"></div>
         <h1 className="display text-4xl font-bold">Your assessment is submitted.</h1>
         <p className="text-ink mt-3">Here is what happens next.</p>
         <ol className="mt-8 space-y-4">

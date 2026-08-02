@@ -2,7 +2,7 @@ import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import { useState } from 'react';
 import { Wordmark } from '@/components/Wordmark';
 import { Btn } from '@/components/Btn';
-export function Assessment({ pool, initialAnswers = {}, onSubmit, onBack, onVoice, }) {
+export function Assessment({ pool, initialAnswers = {}, onSubmit, onBack, onVoice, isSubmitting = false, }) {
     const all = pool?.questions || [];
     const dimLabels = pool?.dimensions || {};
     const [answers, setAnswers] = useState(initialAnswers);
@@ -67,6 +67,6 @@ export function Assessment({ pool, initialAnswers = {}, onSubmit, onBack, onVoic
                                         }, className: `w-full text-left px-5 py-3.5 rounded-xl border-2 flex items-center gap-3 ${sel
                                             ? 'border-royal bg-royal/5'
                                             : 'border-black/10 bg-white hover:border-black/25'}`, children: [_jsx("span", { className: `w-4 h-4 rounded border ${sel ? 'bg-royal border-royal' : 'border-black/30'}` }), o.text] }, o.id));
-                                }) })), q.type === 'open_short' && (_jsxs("div", { children: [_jsx("textarea", { maxLength: q.open_answer_max_chars || 500, value: ans.text || '', onChange: (e) => setAns({ text: e.target.value }), rows: 4, className: "w-full p-4 rounded-xl border-2 border-black/10 focus:border-royal focus:outline-none" }), _jsxs("div", { className: "text-xs text-ink text-right mt-1", children: [(q.open_answer_max_chars || 500) - ((ans.text || '').length), " characters left"] })] }))] }, q.id), _jsxs("div", { className: "flex justify-between mt-10 pb-16", children: [_jsx(Btn, { kind: "ghost", onClick: () => (i === 0 ? onBack() : setI(i - 1)), children: "\u2190 Back" }), _jsx(Btn, { onClick: next, disabled: !answered(), children: i + 1 >= total ? 'Submit assessment' : 'Next →' })] })] })] }));
+                                }) })), q.type === 'open_short' && (_jsxs("div", { children: [_jsx("textarea", { maxLength: q.open_answer_max_chars || 500, value: ans.text || '', onChange: (e) => setAns({ text: e.target.value }), rows: 4, className: "w-full p-4 rounded-xl border-2 border-black/10 focus:border-royal focus:outline-none" }), _jsxs("div", { className: "text-xs text-ink text-right mt-1", children: [(q.open_answer_max_chars || 500) - ((ans.text || '').length), " characters left"] })] }))] }, q.id), _jsxs("div", { className: "flex justify-between mt-10 pb-16", children: [_jsx(Btn, { kind: "ghost", onClick: () => (i === 0 ? onBack() : setI(i - 1)), disabled: isSubmitting, children: "\u2190 Back" }), _jsx(Btn, { onClick: next, disabled: !answered() || isSubmitting, children: isSubmitting && i + 1 >= total ? (_jsxs("span", { className: "flex items-center gap-2", children: [_jsx("span", { className: "inline-block w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" }), "Generating scorecard..."] })) : (i + 1 >= total ? 'Submit assessment' : 'Next →') })] })] })] }));
 }
 //# sourceMappingURL=Assessment.js.map

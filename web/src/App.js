@@ -13,6 +13,7 @@ export function App() {
     const [sc, setSc] = useState(DEMO_SCORECARD);
     const [ctx, setCtx] = useState({});
     const [answers, setAnswers] = useState({});
+    const [isSubmitting, setIsSubmitting] = useState(false);
     useEffect(() => {
         fetch(API + '/api/questions')
             .then((r) => r.json())
@@ -49,6 +50,7 @@ export function App() {
         }
     };
     const submit = (answers) => {
+        setIsSubmitting(true);
         const responses = {};
         Object.entries(answers).forEach(([k, v]) => {
             responses[k] = v;
@@ -72,7 +74,8 @@ export function App() {
             .catch(() => {
             setSc(DEMO_SCORECARD);
             setScreen('submitted');
-        });
+        })
+            .finally(() => setIsSubmitting(false));
     };
     if (screen === 'landing')
         return (_jsx(Landing, { onBegin: begin, onVoice: voice, onSample: () => {
@@ -83,7 +86,7 @@ export function App() {
         return (_jsx(Assessment, { pool: pool, initialAnswers: answers, onSubmit: submit, onBack: () => setScreen('landing'), onVoice: (a) => {
                 setAnswers(a || {});
                 setScreen('voice');
-            } }));
+            }, isSubmitting: isSubmitting }));
     if (screen === 'voice')
         return (_jsx(VoiceInterview, { company: ctx.f?.company_name_raw, industry: ctx.f?.industry_label, name: ctx.f?.prospect_name, role: ctx.f?.prospect_role, priorAnswers: answers, onFinish: voiceFinish, onChat: (a) => {
                 setAnswers(a || {});

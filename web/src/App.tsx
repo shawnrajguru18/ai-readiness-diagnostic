@@ -19,6 +19,7 @@ export function App() {
     c?: ConsentData
   }>({})
   const [answers, setAnswers] = useState<Record<string, Answer>>({})
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   useEffect(() => {
     fetch(API + '/api/questions')
@@ -62,6 +63,7 @@ export function App() {
   }
 
   const submit = (answers: Record<string, Answer>) => {
+    setIsSubmitting(true)
     const responses: Record<string, Answer> = {}
     Object.entries(answers).forEach(([k, v]) => {
       responses[k] = v
@@ -86,6 +88,7 @@ export function App() {
         setSc(DEMO_SCORECARD)
         setScreen('submitted')
       })
+      .finally(() => setIsSubmitting(false))
   }
 
   if (screen === 'landing')
@@ -110,6 +113,7 @@ export function App() {
           setAnswers(a || {})
           setScreen('voice')
         }}
+        isSubmitting={isSubmitting}
       />
     )
   if (screen === 'voice')

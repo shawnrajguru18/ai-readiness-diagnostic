@@ -41,6 +41,9 @@ COPY --from=ui-builder /ui/dist ./web/dist
 COPY web/vendor ./web/vendor
 COPY web/review.html ./web/review.html
 
+# Copy DXC brand assets for PDF generation
+COPY ["DXC Logo", "/app/DXC Logo"]
+
 EXPOSE 8080
 
 # App Runner / ECS route traffic to $PORT (defaults to 8080 here).
