@@ -170,5 +170,7 @@ def parse_structured(
         return parsed_data
 
     except Exception as e:
-        logger.error(f"Bedrock structured invoke failed: {type(e).__name__}: {str(e)[:500]}")
+        error_msg = f"Bedrock structured invoke failed: {type(e).__name__}: {str(e)[:500]}"
+        print(f"[BEDROCK] ✗ EXCEPTION: {error_msg}")
+        logger.error(error_msg)
         raise

@@ -58,6 +58,7 @@ def a2_persona(sub: Submission, hint: str | None = None) -> PersonaInference:
             logger.info("[A2] Used LLM for persona inference")
             return PersonaInference(**r.model_dump())
         except Exception as e:
+            print(f"[DEBUG_A2] ✗ EXCEPTION: {type(e).__name__}: {str(e)[:200]}")
             logger.warning(f"[A2] LLM failed, falling back to deterministic: {e}")
     else:
         logger.info("[A2] LLM not available, using deterministic fallback")
@@ -118,6 +119,7 @@ def c2_synthesis(sub: Submission, persona: PersonaInference, dims: list[Dimensio
             logger.info(f"[C2] Used LLM for synthesis: {len(findings)} findings, duration {rec.duration_estimate_weeks}w")
             return findings, rec, adj, r.partner_attention_flags
         except Exception as e:
+            print(f"[DEBUG_C2] ✗ EXCEPTION: {type(e).__name__}: {str(e)[:200]}")
             logger.warning(f"[C2] LLM failed, falling back to deterministic: {e}")
     else:
         logger.info("[C2] LLM not available, using deterministic fallback")
@@ -310,7 +312,9 @@ def c4_narrative(sub: Submission, persona: PersonaInference, sc: Scorecard) -> E
             else:
                 logger.warning("[C4] LLM returned empty paragraphs")
         except Exception as e:
-            logger.error(f"[C4] LLM failed with exception: {type(e).__name__}: {str(e)[:500]}", exc_info=True)
+            error_msg = f"[C4] LLM failed with exception: {type(e).__name__}: {str(e)[:500]}"
+            print(f"[DEBUG_C4] ✗ EXCEPTION: {error_msg}")
+            logger.error(error_msg, exc_info=True)
             logger.warning(f"[C4] Falling back to deterministic mode")
     else:
         logger.info("[C4] LLM not available, using deterministic fallback")
