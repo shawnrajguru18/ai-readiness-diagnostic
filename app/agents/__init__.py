@@ -306,8 +306,10 @@ def c4_narrative(sub: Submission, persona: PersonaInference, sc: Scorecard) -> E
             logger.info(f"[C4] Attempting LLM invocation with model {settings.model_opus}")
             r: ExecutiveNarrative = parse_structured(C4_SYS, [{"role": "user", "content": user}],
                                                      ExecutiveNarrative, model=settings.model_opus, max_tokens=4000)
-            print(f"[DEBUG_C4] Returned: headline={r.headline!r}, paragraphs={len(r.paragraphs)}")
+            print(f"[DEBUG_C4] Returned: headline={r.headline!r}, paragraphs={r.paragraphs!r}")
+            print(f"[DEBUG_C4] Paragraphs is truthy: {bool(r.paragraphs)}")
             if r.paragraphs:
+                print(f"[DEBUG_C4] ✓ RETURNING LLM RESULT with {len(r.paragraphs)} paragraphs")
                 logger.info(f"[C4] Used LLM for narrative: {len(r.paragraphs)} paragraphs")
                 return r
             else:
