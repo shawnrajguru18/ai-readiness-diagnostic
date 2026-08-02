@@ -115,8 +115,10 @@ def parse_structured(
     from .config import llm_available
     import json
     import logging
+    import sys
     logger = logging.getLogger(__name__)
 
+    print(f"[BEDROCK] parse_structured called for schema={schema.__name__}, model={model or settings.default_model}")
     logger.info(f"Invoking Bedrock: model={model or settings.default_model}, llm_available={llm_available()}")
 
     try:

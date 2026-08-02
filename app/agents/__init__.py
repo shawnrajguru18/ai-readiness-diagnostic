@@ -98,7 +98,10 @@ C2_SYS = (
 
 def c2_synthesis(sub: Submission, persona: PersonaInference, dims: list[DimensionScore],
                  research: dict[str, Any]) -> tuple[list[Finding], RecommendedNextStep, dict[str, int], list[str]]:
-    if llm_available():
+    llm_ok = llm_available()
+    print(f"[DEBUG_C2] llm_available()={llm_ok}")
+    if llm_ok:
+        print(f"[DEBUG_C2] Entering LLM branch")
         from ..llm import parse_structured
         user = (f"Prospect: {sub.company_name_raw} | Industry: {sub.industry_label} | "
                 f"Primary persona: {persona.primary_persona}\n\nDimension scores:\n{_scores_text(dims)}\n\n"
@@ -286,7 +289,9 @@ def c4_narrative(sub: Submission, persona: PersonaInference, sc: Scorecard) -> E
     llm_ok = llm_available()
     print(f"[DEBUG_C4] llm_available()={llm_ok}, company={sc.company_name}")
     if llm_ok:
+        print(f"[DEBUG_C4] Entering LLM branch, about to import parse_structured")
         from ..llm import parse_structured
+        print(f"[DEBUG_C4] parse_structured imported successfully")
         user = (f"Prospect: {sc.company_name} | Industry: {sc.industry_label} | "
                 f"Primary persona: {persona.primary_persona} ({persona.framing_preference})\n\n"
                 f"Overall: {sc.overall_score}/100 {sc.overall_tier}. {sc.peer_reference}\n"
