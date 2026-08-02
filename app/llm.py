@@ -162,10 +162,13 @@ def parse_structured(
             raise RuntimeError("No tool_use block found in response")
 
         # Remediate common hallucinations before validation
+        print(f"[BEDROCK] Raw tool input keys: {list(tool_call.input.keys()) if isinstance(tool_call.input, dict) else type(tool_call.input)}")
         remediated = _remediate_payload(tool_call.input)
+        print(f"[BEDROCK] After remediate keys: {list(remediated.keys()) if isinstance(remediated, dict) else type(remediated)}")
 
         # Parse and validate
         parsed_data = schema.model_validate(remediated)
+        print(f"[BEDROCK] ✓ Validation passed for {schema.__name__}")
         logger.info(f"Structured output succeeded via tool_use")
         return parsed_data
 

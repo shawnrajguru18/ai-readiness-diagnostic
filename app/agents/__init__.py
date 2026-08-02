@@ -306,10 +306,12 @@ def c4_narrative(sub: Submission, persona: PersonaInference, sc: Scorecard) -> E
             logger.info(f"[C4] Attempting LLM invocation with model {settings.model_opus}")
             r: ExecutiveNarrative = parse_structured(C4_SYS, [{"role": "user", "content": user}],
                                                      ExecutiveNarrative, model=settings.model_opus, max_tokens=4000)
+            print(f"[DEBUG_C4] Returned: headline={r.headline!r}, paragraphs={len(r.paragraphs)}")
             if r.paragraphs:
                 logger.info(f"[C4] Used LLM for narrative: {len(r.paragraphs)} paragraphs")
                 return r
             else:
+                print(f"[DEBUG_C4] ✗ Empty paragraphs, falling back to deterministic")
                 logger.warning("[C4] LLM returned empty paragraphs")
         except Exception as e:
             error_msg = f"[C4] LLM failed with exception: {type(e).__name__}: {str(e)[:500]}"
