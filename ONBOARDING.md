@@ -225,7 +225,7 @@ docker build -t ai-readiness-diagnostic:latest .
 # Stage 2: Python → copies dist/ + app code → runs uvicorn
 ```
 
-### Deploying to AWS
+### Deploying Code Changes (to existing infrastructure)
 
 **IMPORTANT: Use Bash, not PowerShell** (ForceMFA policy blocks PowerShell docker login)
 
@@ -256,6 +256,195 @@ aws elbv2 register-targets --target-group-arn $TG_ARN --targets Id=$NEW_IP,Port=
 # 7. Wait 15 seconds, then test
 curl -k https://ai-readiness-alb-751626769.us-east-1.elb.amazonaws.com/ping
 ```
+
+---
+
+## 🏗 Creating Infrastructure from Scratch (Terraform)
+
+If you need to set up a new environment or rebuild from scratch, use Terraform.
+
+### Prerequisites
+- Terraform >= 1.0 (https://www.terraform.io/downloads)
+- AWS CLI v2 configured with credentials
+- Docker (to build images)
+
+### Step 1: Configure Terraform
+
+```bash
+cd terraform
+
+# Copy example config
+cp terraform.tfvars.example terraform.tfvars
+
+# Edit terraform.tfvars with your values:
+# - aws_region: AWS region (default: us-east-1)
+# - app_name: Application name (default: ai-readiness-diagnostic)
+# - container_image: ECR image URL (will update after first deploy)
+# - task_cpu / task_memory: ECS task sizing
+# - desired_count: Number of tasks (default: 1)
+```
+
+Example `terraform.tfvars`:
+```hcl
+aws_region      = "us-east-1"
+app_name        = "ai-readiness-diagnostic"
+environment     = "production"
+container_image = "023138541872.dkr.ecr.us-east-1.amazonaws.com/ai-readiness-diagnostic:latest"
+container_port  = 8080
+task_cpu        = 1024
+task_memory     = 2048
+desired_count   = 1
+```
+
+### Step 2: Initialize & Plan
+
+```bash
+# Initialize Terraform (downloads AWS provider)
+terraform init
+
+# Plan infrastructure
+terraform plan -out=tfplan
+
+# Review the output — this shows what will be created
+```
+
+### Step 3: Apply Infrastructure
+
+```bash
+# Create all resources
+terraform apply tfplan
+
+# This creates:
+# - ECR repository (for Docker images)
+# - ECS Fargate cluster & service (runs containerized app)
+# - DynamoDB table (session storage)
+# - IAM roles (for ECS task permissions)
+# - CloudWatch log group (backend logs)
+# - Security groups (networking)
+# - Application Load Balancer (HTTPS, routing)
+```
+
+**Save the outputs:**
+```bash
+terraform output
+# Note: ecr_repository_url, alb_dns_name, etc.
+```
+
+### Step 4: Push Docker Image to ECR
+
+```bash
+# Build Docker image
+docker build -t ai-readiness-diagnostic:latest .
+
+# Login to ECR (use Bash!)
+ACCOUNT="023138541872"
+aws ecr get-login-password --region us-east-1 | \
+  docker login --username AWS --password-stdin $ACCOUNT.dkr.ecr.us-east-1.amazonaws.com
+
+# Push image
+docker tag ai-readiness-diagnostic:latest $ACCOUNT.dkr.ecr.us-east-1.amazonaws.com/ai-readiness-diagnostic:latest
+docker push $ACCOUNT.dkr.ecr.us-east-1.amazonaws.com/ai-readiness-diagnostic:latest
+```
+
+### Step 5: Verify
+
+```bash
+# Check ECS service is running
+aws ecs describe-services --cluster ai-readiness-diagnostic-cluster \
+  --services ai-readiness-diagnostic-service --region us-east-1
+
+# Test app (may take 1-2 minutes to start)
+ALB_DNS=$(terraform output -raw alb_dns_name)
+curl -k https://$ALB_DNS/ping
+```
+
+---
+
+## 💣 Destroying Infrastructure (Teardown)
+
+**IMPORTANT: This deletes everything permanently (ECS, DynamoDB, ECR, etc.).**
+
+```bash
+cd terraform
+
+# Show what will be destroyed
+terraform plan -destroy
+
+# Destroy all resources
+terraform destroy
+
+# Confirm when prompted (type 'yes')
+```
+
+**What gets deleted:**
+- ECS cluster, service, tasks
+- DynamoDB table (all session data)
+- ECR repository (all Docker images)
+- Application Load Balancer & listeners
+- IAM roles & policies
+- CloudWatch log group
+- Security groups
+- VPC resources (if created by Terraform)
+
+**After teardown:**
+```bash
+# State is updated
+git status  # terraform.tfstate will show changes
+
+# Optional: Commit the destroyed state
+git add terraform.tfstate terraform.tfstate.backup
+git commit -m "Destroy infrastructure"
+```
+
+---
+
+## 🔄 Updating Infrastructure
+
+If you need to change infrastructure (scale up, change instance type, etc.):
+
+```bash
+cd terraform
+
+# Edit terraform.tfvars (e.g., change task_cpu or desired_count)
+vim terraform.tfvars
+
+# Plan the changes
+terraform plan -out=tfplan
+
+# Apply the changes
+terraform apply tfplan
+```
+
+Common changes:
+```hcl
+# Scale up ECS tasks
+desired_count = 3  # instead of 1
+
+# Increase resources
+task_cpu    = 2048  # instead of 1024
+task_memory = 4096  # instead of 2048
+
+# Enable auto-scaling
+enable_autoscaling = true
+min_capacity       = 1
+max_capacity       = 5
+```
+
+---
+
+## 🔐 AWS Permissions Required
+
+The user running Terraform needs these IAM permissions:
+- `ecs:*` (ECS cluster, service, tasks)
+- `ec2:*` (VPC, security groups, ENI)
+- `dynamodb:*` (DynamoDB table)
+- `ecr:*` (ECR repository)
+- `iam:*` (IAM roles, policies)
+- `logs:*` (CloudWatch logs)
+- `elasticloadbalancing:*` (ALB)
+- `acm:*` (SSL certificates)
+
+**Current setup:** Uses ForceMFA policy (requires MFA for console access, but allows programmatic access via AWS CLI)
 
 ---
 
