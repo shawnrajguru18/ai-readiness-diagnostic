@@ -55,7 +55,7 @@ Output goes to `dist/`. Deploy this folder to any static host or FastAPI.
 
 - **USAGE.md** — Full guide with all tasks and troubleshooting
 - **README.md** — Project structure and architecture
-- **REFACTORING.md** — What changed from the original
+- **../docs/INDEX.md** — Every document in the repository, with phase and status
 
 ## Support
 

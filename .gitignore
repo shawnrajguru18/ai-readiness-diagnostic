@@ -26,9 +26,12 @@ Thumbs.db
 
 # Terraform
 terraform/.terraform/
-terraform/*.tfstate*
+*.tfstate
+*.tfstate.*
 terraform/.terraform.lock.hcl
 
 # Env files
 .env
 .env.local
+
+outputs

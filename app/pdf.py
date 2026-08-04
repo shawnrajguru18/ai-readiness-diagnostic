@@ -44,8 +44,10 @@ DIMENSION_GUIDE = {
         "actions": ["Classify in-flight and planned use cases by risk tier", "Close documentation, human-oversight, and monitoring gaps", "Track applicable frameworks (e.g. EU AI Act) on a horizon scan"]},
 }
 
-_ROOT = Path(__file__).resolve().parent.parent
-_LOGO = _ROOT / "DXC Logo" / "Brand Mark" / "1 Color" / "RGB" / "DXC-1-Color-Dark.svg"
+# Vendored copy of assets/DXC Logo/Brand Mark/1 Color/RGB/DXC-1-Color-Dark.svg — see
+# app/assets/README.md. Anchored to this package so it travels with the app: the Docker image
+# copies app/ and nothing above it.
+_LOGO = Path(__file__).resolve().parent / "assets" / "dxc-brand-mark-dark.svg"
 
 
 def _logo_flowable(width_pt: float = 84.0):

@@ -10,6 +10,57 @@ Docker image ──push──▶ ECR ──pull──▶ ECS Fargate task ┬─
                                   (public IP, auto)   └─▶ Bedrock (Claude models, SigV4)
 ```
 
+## What is in this directory
+
+| | |
+|---|---|
+| **Scripts** | see the table below — both provisioning paths |
+| **Runbooks** | [pre_destroy_checklist.md](pre_destroy_checklist.md), [post_destroy_validation.md](post_destroy_validation.md) |
+| **Plans and records** | [deprovisioning_plan.md](deprovisioning_plan.md), [terraform_deployment.md](terraform_deployment.md) |
+| **IAM** | [iam/forcemfa_policy_v2.json](iam/forcemfa_policy_v2.json) — the force-MFA policy the two `.ps1` scripts assume |
+
+The general pre/post-release checklist is **not** here — it is target-agnostic and lives at
+[../../docs/deployment/deploy_checklist.md](../../docs/deployment/deploy_checklist.md).
+Everything else is indexed in [../../docs/INDEX.md](../../docs/INDEX.md).
+
+### Scripts
+
+There are **two provisioning paths**, and this directory now holds the scripts for both. Pick a
+path and stay on it.
+
+| Script | Path | What it does |
+|---|---|---|
+| `01-bootstrap.sh` → `02-deploy.sh` → `03-teardown.sh` (config in `config.sh`) | shell | The procedure documented below. |
+| `deploy.ps1` | Terraform | Windows: MFA session token, then `terraform apply` on `terraform/`. |
+| `push-image.ps1` | Terraform | Windows: MFA session token, push image to ECR, force an ECS redeploy. |
+| `destroy_terraform.sh` | Terraform | `terraform destroy` with backups and confirmations. |
+| `post_destroy_validation.sh` | **both** | Read-only check that resources are actually gone. Verifies both name sets. |
+
+The two paths **overlap on some resources and diverge on others**, which is what makes mixing them
+dangerous:
+
+| Resource | shell (`config.sh`) | Terraform (`app_name`) |
+|---|---|---|
+| ECR repository | `ai-readiness-diagnostic` | `ai-readiness-diagnostic` — **same** |
+| ECS service | `ai-readiness-diagnostic` | `ai-readiness-diagnostic` — **same** |
+| IAM task role | `ai-readiness-diagnostic-task-role` | `ai-readiness-diagnostic-task-role` — **same** |
+| CloudWatch log group | `/ecs/ai-readiness-diagnostic` | `/ecs/ai-readiness-diagnostic` — **same** |
+| ECS **cluster** | `ai-readiness-cluster` | `ai-readiness-diagnostic-cluster` — **differs** |
+| DynamoDB **table** | `ai-readiness-sessions` | `ai-readiness-diagnostic-sessions` — **differs** |
+
+Consequences worth knowing before you run anything:
+
+- A teardown script from the wrong path **reports success while deleting nothing** — the cluster and
+  table it looks for do not exist under that name. `post_destroy_validation.sh` exists to catch this.
+- Running both paths leaves **two clusters and two tables**, with the second table holding assessment
+  data nobody is looking at, and both billing.
+- Because the ECR repo and IAM role are shared, whichever path runs last **overwrites** them, and
+  `push-image.ps1` pushes to that shared repo before redeploying only the Terraform cluster's service.
+
+Before any teardown, work through
+[pre_destroy_checklist.md](pre_destroy_checklist.md) —
+step 2.3 is the check that establishes which path created the live resources.
+
 ## Prerequisites
 - **AWS CLI v2**, authenticated to the target account. At DXC this is typically SSO:
   `aws sso login` (or `aws configure sso` the first time).
@@ -74,6 +125,19 @@ and deterministic offline pipeline — no AWS needed.
   fine for these scorecards; revisit if sessions ever grow large.
 
 ## Teardown
+
+For the shell path, prefer the script — it deletes the set `config.sh` created:
+
+```bash
+cd deploy/aws
+bash 03-teardown.sh
+bash post_destroy_validation.sh   # read-only; confirms nothing survived under either name set
+```
+
+For the Terraform path use `bash deploy/aws/destroy_terraform.sh` instead.
+
+The raw commands below are the shell path's teardown expanded, kept for reference:
+
 ```bash
 # Delete ECS service and cluster
 aws ecs delete-service --cluster ai-readiness-cluster --service ai-readiness-diagnostic --region us-east-1 --force

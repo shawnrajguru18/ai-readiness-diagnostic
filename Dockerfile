@@ -30,7 +30,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf 
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy app code + content/fixtures (FastAPI backend)
+# Copy app code + content/fixtures (FastAPI backend).
+# This also carries app/assets/ — the one brand-mark SVG the PDF generator needs. The full
+# brand kit under assets/ is deliberately NOT copied: it is 20 MB of print masters (EPS/CMYK)
+# that nothing at runtime can use.
 COPY app ./app
 COPY content ./content
 
@@ -40,9 +43,6 @@ COPY --from=ui-builder /ui/dist ./web/dist
 # Copy vendor libs and review.html for partner dashboard
 COPY web/vendor ./web/vendor
 COPY web/review.html ./web/review.html
-
-# Copy DXC brand assets for PDF generation
-COPY ["DXC Logo", "/app/DXC Logo"]
 
 EXPOSE 8080
 

@@ -174,7 +174,7 @@ jobs:
           echo "- [ ] Docker image builds successfully" >> $GITHUB_STEP_SUMMARY
           echo "- [ ] No critical vulnerabilities (tfsec, Trivy)" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "See [DEPLOY_CHECKLIST.md](DEPLOY_CHECKLIST.md) for full details." >> $GITHUB_STEP_SUMMARY
+          echo "See [deploy_checklist.md](docs/deployment/deploy_checklist.md) for full details." >> $GITHUB_STEP_SUMMARY
 
   security-gates:
     runs-on: ubuntu-latest
