@@ -9,6 +9,7 @@ import { API, DEMO_SCORECARD } from './constants'
 import { Scorecard as ScorecardType, QuestionPool, Answer, FormData, ConsentData } from './types'
 
 export function App() {
+  console.log('[App] API constant value:', API)
   const [screen, setScreen] = useState<
     'landing' | 'assessment' | 'voice' | 'submitted' | 'scorecard' | 'quickwins'
   >('landing')
@@ -22,10 +23,21 @@ export function App() {
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   useEffect(() => {
-    fetch(API + '/api/questions')
-      .then((r) => r.json())
-      .then(setPool)
-      .catch(() => setPool(null))
+    const url = API + '/api/questions'
+    console.log('[App] Fetching questions from:', url)
+    fetch(url)
+      .then((r) => {
+        console.log('[App] Response status:', r.status)
+        return r.json()
+      })
+      .then((data) => {
+        console.log('[App] Questions loaded:', data ? 'success' : 'null')
+        setPool(data)
+      })
+      .catch((err) => {
+        console.error('[App] Failed to load questions:', err)
+        setPool(null)
+      })
   }, [])
 
   const begin = (f: FormData, c: ConsentData) => {
@@ -76,12 +88,25 @@ export function App() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     })
-      .then((r) => r.json())
+      .then((r) => {
+        if (!r.ok) {
+          throw new Error(`HTTP ${r.status}: ${r.statusText}`)
+        }
+        return r.json()
+      })
       .then((d) => {
-        setSc(d)
+        if (d.error) {
+          console.error('[submitVoice] Backend error:', d.error)
+          alert(`Backend error: ${d.error}`)
+          setSc(DEMO_SCORECARD)
+        } else {
+          setSc(d)
+        }
         setScreen('submitted')
       })
-      .catch(() => {
+      .catch((err) => {
+        console.error('[submitVoice] Error:', err)
+        alert(`Failed to generate scorecard: ${err.message}`)
         setSc(DEMO_SCORECARD)
         setScreen('submitted')
       })
@@ -105,12 +130,25 @@ export function App() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     })
-      .then((r) => r.json())
+      .then((r) => {
+        if (!r.ok) {
+          throw new Error(`HTTP ${r.status}: ${r.statusText}`)
+        }
+        return r.json()
+      })
       .then((d) => {
-        setSc(d)
+        if (d.error) {
+          console.error('[submit] Backend error:', d.error)
+          alert(`Backend error: ${d.error}`)
+          setSc(DEMO_SCORECARD)
+        } else {
+          setSc(d)
+        }
         setScreen('submitted')
       })
-      .catch(() => {
+      .catch((err) => {
+        console.error('[submit] Error:', err)
+        alert(`Failed to generate scorecard: ${err.message}`)
         setSc(DEMO_SCORECARD)
         setScreen('submitted')
       })

@@ -195,11 +195,21 @@ def fixture(name: str):
 
 @app.post("/api/assess")
 def assess(req: AssessRequest):
-    session, hint = build_session(req.submission, req.consent, req.responses, req.persona_hint)
-    run_pipeline(session, persona_hint=hint, voice_responses=req.voice_responses)
-    sid = _store(session)
-    out = dict(_serialize(session)); out["id"] = sid
-    return JSONResponse(out)
+    try:
+        print(f"[ASSESS] Building session with submission: {req.submission}")
+        session, hint = build_session(req.submission, req.consent, req.responses, req.persona_hint)
+        print(f"[ASSESS] Running pipeline with {len(req.responses)} responses, {len(req.voice_responses)} voice responses")
+        run_pipeline(session, persona_hint=hint, voice_responses=req.voice_responses)
+        print(f"[ASSESS] Pipeline complete, storing session")
+        sid = _store(session)
+        out = dict(_serialize(session)); out["id"] = sid
+        return JSONResponse(out)
+    except Exception as e:
+        error_msg = f"{type(e).__name__}: {str(e)}"
+        print(f"[ASSESS ERROR] {error_msg}", flush=True)
+        import traceback
+        traceback.print_exc(file=__import__('sys').stdout)
+        return JSONResponse({"error": error_msg, "type": type(e).__name__}, status_code=500)
 
 
 # ---------------- Partner review (Screen 6) ----------------

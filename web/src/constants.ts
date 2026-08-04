@@ -1,6 +1,9 @@
+console.log('[CONSTANTS] Loading constants.ts file')
+
 import { Scorecard } from './types'
 
-export const API = '' // same-origin when served by FastAPI; empty -> offline demo fallback
+export const API = '' // empty string = same origin (production)
+console.log('[CONSTANTS] API =', API)
 
 export const ELEVENLABS_AGENT_ID = 'agent_0501kz1wxj5pfe39krrt9nbej8mr'
 

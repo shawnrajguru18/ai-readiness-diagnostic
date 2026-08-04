@@ -444,13 +444,35 @@ Voice Interview Responses:
 Score each AI readiness dimension (0-100). Be specific and cite the response that drove your assessment."""
 
         try:
-            llm_client = get_llm_client()
-            resp = llm_client.messages.create(
-                model=settings.model_opus,
-                max_tokens=1500,
-                system=VOICE_SCORING_SYS,
-                messages=[{"role": "user", "content": user_prompt}]
-            )
+            import threading
+            result = {"resp": None, "error": None}
+
+            def call_llm():
+                try:
+                    llm_client = get_llm_client()
+                    result["resp"] = llm_client.messages.create(
+                        model=settings.model_opus,
+                        max_tokens=1500,
+                        system=VOICE_SCORING_SYS,
+                        messages=[{"role": "user", "content": user_prompt}]
+                    )
+                except Exception as e:
+                    result["error"] = e
+
+            thread = threading.Thread(target=call_llm, daemon=False)
+            thread.start()
+            thread.join(timeout=45)  # 45 second timeout
+
+            if thread.is_alive():
+                logger.error("[VOICE] LLM call timed out after 45 seconds")
+                raise TimeoutError("LLM response took too long")
+
+            if result["error"]:
+                raise result["error"]
+
+            resp = result["resp"]
+            if not resp:
+                raise Exception("No response from LLM")
 
             # Parse LLM response
             content = resp.content[0].text if resp.content else "{}"
@@ -486,8 +508,7 @@ Score each AI readiness dimension (0-100). Be specific and cite the response tha
                     dimension=dim_key,
                     label=dim_label,
                     score=score_val,
-                    tier="Informational" if is_informational else
-                         ("Emerging" if score_val < 40 else
+                    tier=("Emerging" if score_val < 40 else
                           "Developing" if score_val < 60 else
                           "Established" if score_val < 80 else "Leading"),
                     reasoning=reasoning,
@@ -518,7 +539,7 @@ Score each AI readiness dimension (0-100). Be specific and cite the response tha
             dimension=dim_key,
             label=dim_label,
             score=50,
-            tier="Informational" if dim_key == "regulatory_complexity" else "Developing",
+            tier="Developing",
             reasoning="Default score from voice interview (LLM unavailable).",
             confidence=0.5,
             informational=dim_key == "regulatory_complexity"
