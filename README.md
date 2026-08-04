@@ -8,6 +8,15 @@ a recommended next step, and 90-day quick wins. A senior partner reviews before 
 > Built and verified end-to-end. Runs **offline** (deterministic scoring + deterministic
 > agent fallbacks) or on **Claude** when `ANTHROPIC_API_KEY` is set (A2/C2/C3 enrich the output).
 
+## Project links
+
+| Link | What it is |
+|---|---|
+| [Value Realization and Program Management-AdvisoryX Agentic Transformation](https://dxcportal.sharepoint.com/:f:/r/sites/ValueRealizationandProgramManagement-AdvisoryXAgenticTransformation/Shared%20Documents/00%20DIAGNOSTIC?d=w519d611923a940aab4266323b235ae1c&csf=1&web=1&e=YyfnmR) | SharePoint — the `00 DIAGNOSTIC` folder. Source material and deliverables outside this repository. DXC sign-in required. |
+| [docs/INDEX.md](docs/INDEX.md) | Every document in this repository, with date, phase and status. |
+| [deploy/aws/DEPLOY_AWS.md](deploy/aws/DEPLOY_AWS.md) | Deploying to AWS, and taking it down. |
+| [docs/architecture/architecture_topics.md](docs/architecture/architecture_topics.md) | The ten architectural decisions still open. |
+
 ## Architecture (Companion-aligned)
 
 ```
@@ -42,30 +51,49 @@ python -m pytest -q
 
 ```
 app/
+  api.py           FastAPI: /api/questions, /api/assess, /api/fixture/{name}; serves web/
   config.py        model tiering + llm_available()
-  llm.py           Anthropic wrapper (adaptive thinking, structured outputs)
+  llm.py           LLM wrapper (adaptive thinking, structured outputs)
   models.py        Pydantic schemas (Companion 05 subset)
   content.py       loaders (question pool, quick-wins library, fixtures)
   scoring.py       deterministic dimension + overall scoring (Companion 01)
+  benchmarks.py    indicative peer benchmarks — hardcoded for V0, not yet data-driven
+  research.py      B1 (SEC EDGAR financials) + B2 (news), best-effort; optional, off by default
   agents/__init__.py  A2 / C2 / C3 / D2 (Companion 04 prompts + offline fallbacks)
   orchestrator.py  the V0 pipeline
-  scorecard.py     server-side scorecard render (Companion 03) -> HTML/PDF
-  api.py           FastAPI: /api/questions, /api/assess, /api/fixture/{name}, serves web/
+  scorecard.py     server-side scorecard render (Companion 03) -> HTML
+  pdf.py           PDF deliverable (D1 render) via reportlab
+  store.py         session persistence — in-memory locally, DynamoDB when AIDIAG_DDB_TABLE is set
+  assets/          runtime assets (the brand-mark SVG pdf.py loads) — see app/assets/README.md
 content/
-  question_pool.yaml   20 questions, options, scores, within-dimension weights (Companion 01)
-  quick_wins.yaml      15 quick-win patterns (Companion 02)
+  question_pool.yaml         20 questions, options, scores, within-dimension weights (Companion 01)
+  quick_wins.yaml            15 quick-win patterns (Companion 02)
+  interview_definition.yaml  voice-interview script for the ElevenLabs agent
+  consent_copy.md            consent text C-1 to C-5
 fixtures/          meridianfs | northerncare | aureliantech (Companion 03 demo scenarios)
-web/index.html     React UI (5 screens: Landing, Questionnaire, Submitted, Scorecard, Quick Wins)
-scripts/run_chat_cli.py   terminal pipeline runner
-tests/test_smoke.py       content integrity + deterministic scoring vs Companion targets
+web/
+  src/screens/     Landing, Assessment, Submitted, Scorecard, QuickWins, VoiceInterview
+  src/components/  Btn, DxcLogo, Wordmark, Radar, TierBadge, ValueDifficulty2x2
+  index.html       Vite entry point (built by the Docker UI stage into web/dist)
+  review.html      partner review dashboard — standalone, not part of the Vite build
+scripts/
+  run_chat_cli.py    terminal pipeline runner
+  gen_voice_agent.py ElevenLabs agent config generator
+tests/
+  test_smoke.py             content integrity + deterministic scoring vs Companion targets
+  test_store.py             session store
+  test_evaluation_suite.py  audit findings — security, concurrency, data integrity
+deploy/aws/        AWS provisioning, teardown and validation — see deploy/aws/DEPLOY_AWS.md
+terraform/         IaC for the deployed stack: ECS Fargate, DynamoDB, ECR, IAM
+docs/              all project documentation — see docs/INDEX.md
+assets/            DXC brand kit (design source; nothing reads it at runtime)
 ```
 
 ## Status / next
 - **Done & verified:** question pool + scoring engine (offline), A2/C2/C3/D2 agents with fallbacks,
-  pipeline, scorecard render, FastAPI, React UI (5 screens), three demo fixtures, tests.
+  pipeline, scorecard render, FastAPI, React UI (6 screens), three demo fixtures, tests.
 - **Enrich with the API key:** set `ANTHROPIC_API_KEY` so C2 writes prospect-specific findings and the
   recommended next step, and C3 selects gap-aligned quick wins per the Companion 04 prompts.
 - **Deferred (per PRD/Companions):** real research tools B1/B2/B3 (SEC EDGAR/news/tech-stack, currently
   optional/off), B4/B5, C1 industry library, D1 persona-variant PDFs, E1–E3 downstream, partner-review
   dashboard (Screen 6), peer-benchmark data (V0.5+).
-```
