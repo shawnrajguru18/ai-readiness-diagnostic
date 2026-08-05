@@ -26,8 +26,7 @@ Target-state design, and analyses of the gap between design and build.
 |---|---|---|---|---|
 | 2026-06-17 | [aws_reference_architecture_and_cost_model.md](architecture/aws_reference_architecture_and_cost_model.md) | AWS reference architecture and cost model by Chris Bryson: component list, sizing (50 client orgs/month, ~175 interviews/month), lean ~$640/month production, per-environment costs, cost-control levers. Target state, largely unbuilt — it describes Cognito, Lambda, Step Functions and CloudFront, none of which exist in `terraform/`. Renamed from `architecture.md` on 2026-08-04. | PROD | ACTIVE |
 | 2026-08-04 | [architecture_topics.md](architecture/architecture_topics.md) | Ten architectural topics the platform must decide, each split into specified / current / open with `file:line` citations, plus a sequencing recommendation. | MVP | ACTIVE |
-| 2026-08-03 | [architecture_review_access_control.md](architecture/architecture_review_access_control.md) | Access-control and identity review: findings P0-1–P1-5, an invitation workflow, a four-table data model, phased plan, and decisions D1–D6. | MVP | ACTIVE |
-| 2026-08-03 | [workflows_and_data_governance.md](architecture/workflows_and_data_governance.md) | Client workflow, admin workflow, and data lifetime and governance — incorporating the access-control review. | MVP | ACTIVE |
+| 2026-08-04 | [authorization_model_phase1.md](architecture/authorization_model_phase1.md) | **Draft specification — the single source for access control.** Passwordless email identity for all roles — single-use sign-in link plus rolling server-side session, no stored credential and no second factor in Phase 1; four roles (`user` / `power_user` / `partner` / `admin`); organizations as a first-class tenant boundary; partner assignments; capability and route matrices; bootstrap (the one password-style exception), invitation, token-lifecycle and sign-in rules; session lifetimes; findings P0-1–P1-5 and P2; enforcement rules; residual risks; Phase 1 scope cut and delivery sequence; Stage 2 parking area (erasure); open points A–H. Absorbed and replaced `architecture_review_access_control.md` (3 Aug) on 4 Aug. | MVP | ACTIVE |
 | 2026-08-03 | [workflows_and_data_governance_baseline.md](architecture/workflows_and_data_governance_baseline.md) | The same three questions answered from the project's own documentation only, with the access-control review excluded. | MVP | ACTIVE |
 
 ## product/
@@ -115,7 +114,6 @@ Decision records.
 
 | Document Date | Name | Description | Phase | Status |
 |---|---|---|---|---|
-| 2026-08-04 | [2026-08-04_architecture_review_brief.md](meetings/2026-08-04_architecture_review_brief.md) | Meeting brief for the 4 Aug working session (action D4): the ten architecture topics condensed to one line each, five decisions requested from the room, blockers in the order they bite, and a sequencing recommendation. Derived from `architecture_topics.md`; reconciles it against the 2026-08-03 authentication decision. | MVP | ACTIVE |
 | 2026-08-03 | [2026-08-03_meeting_summary.md](meetings/2026-08-03_meeting_summary.md) | Kickoff. **Resolves authentication:** username and password for V1, email MFA for V2, Delivery ID and Okta dropped, no client self-provisioning — DXC issues time-limited registration invitations — and Entra ID for internal and admin roles. Also: HTTPS on a real DNS name is the critical path (URL and certificate already exist); QA and production environments required; architect for phase one of a roadmap; Catalyst optional and not to be built around. Transcript is partial — ~20 of 63 minutes missing. | MVP | ACTIVE |
 | 2026-07-24 | [2026-07-24_meeting_summary_analysis.md](meetings/2026-07-24_meeting_summary_analysis.md) | Gap analysis of the scoping call: nine open items with owners and severities. Item #3 (authentication) is now closed by the 2026-08-03 kickoff; items #1, #4, #6 and #9 remain open. | R&D | ACTIVE |
 | 2026-07-24 | [2026-07-24_meeting_summary.md](meetings/2026-07-24_meeting_summary.md) | Intro and scoping call record. Superseded on scope, timeline and authentication by the 2026-08-03 kickoff. | R&D | ARCHIVE |
@@ -154,7 +152,8 @@ to React migration, long since done), `DOCS_INDEX.md` (a second index, for a doc
 exists), and `AWS_DEPLOYMENT.md` + `DEPLOYMENT_CHECKLIST.md` (an S3 + CloudFront design that was
 never built — the app ships as one container serving `web/dist` from FastAPI, per
 `deploy/aws/DEPLOY_AWS.md`). `API_CONTRACT.md` went with them; `app/models.py` is the request/response
-schema of record, and the endpoints are described in `workflows_and_data_governance.md`.
+schema of record, and every route as built is tabulated in
+`architecture/authorization_model_phase1.md` §8.2.
 
 **The dividing line.** A document lives under `docs/` when it would still be true if the project
 moved off AWS; it lives with the code when it names this account, these resources, or these scripts.

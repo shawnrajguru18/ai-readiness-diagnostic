@@ -14,7 +14,8 @@ claim can be checked rather than trusted. Two short forms recur: `meeting_summar
 `docs/product/companion_0N_*.md`. Root-level docs are cited by basename; see `docs/INDEX.md`
  for the name-to-path map.
 
-**Sources:** the repository's markdown, excluding `docs/architecture_review_access_control.md` —
+**Sources:** the repository's markdown, excluding the 3 Aug access-control review (since folded into
+`docs/architecture/authorization_model_phase1.md` and removed) —
 consistent with `docs/workflows_and_data_governance_baseline.md`, on which this outline is built.
 That review already covers topics 1 and 2 in depth and can be folded back in when we want a proposal
 rather than a problem statement.
@@ -487,7 +488,7 @@ client-facing surface currently promises a partner-reviewed scorecard within 24 
 ---
 
 *Related: `docs/workflows_and_data_governance_baseline.md` (the analysis this outline rests on),
-`docs/workflows_and_data_governance.md` (the same analysis including the access-control review),
+`docs/architecture/authorization_model_phase1.md` (topics 1 and 2 specified rather than surveyed),
 `aws_reference_architecture_and_cost_model.md` (target AWS architecture and cost model),
 `meetings/2026-07-24_meeting_summary_analysis.md` (open items and owners),
 `master_audit_report.md` / `quick_reference.md` / `evaluation_suite.md` (security and integrity
