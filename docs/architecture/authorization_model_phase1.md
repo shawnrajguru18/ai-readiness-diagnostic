@@ -2,7 +2,11 @@
 
 **Date:** 4 August 2026
 **Status:** DRAFT SPECIFICATION — normative for Phase 1 implementation; §14 lists points not yet decided
-**Verified against:** commit `cbfa830` (branch `main`) for all current-state statements
+**Verified against:** commit `cbfa830` (branch `main`) for all current-state statements.
+**§8.2 and §9 are stale against the running code.** The application has moved since `cbfa830` —
+notably the voice scoring path, which is why `data_architecture_phase1.md` **D-1** (BLOCKING) and
+**D-8** do not appear in §9. Treat §9 as sized against `cbfa830`, and re-verify before sizing Phase 0
+from it
 **Scope:** Access control for the AI Readiness Diagnostic — identity, roles, tenancy, isolation, and
 the invitation and session lifecycle. Covers the topics recorded as open in `architecture_topics.md` §2.
 
@@ -87,7 +91,12 @@ default, and never inferred from `position` or any other attribute.
 
 ## 3. Capability matrix
 
-Normative. Any capability not listed is denied.
+**Normative, and it is the target matrix — not the Phase 1 matrix.** Any capability not listed is
+denied. The `power_user` column is the one difference: §12.1 defers that role, so no account holds it
+in Phase 1 and every client account is created as `user`. The column is specified here rather than
+added later because deferring the role must not mean deferring the decision about what it may read;
+implementing it later then alters no existing record and revokes no existing permission. §8.1 carries
+the same distinction and is labelled the same way.
 
 | Capability | `user` | `power_user` | `partner` | `admin` |
 |---|:--:|:--:|:--:|:--:|
@@ -162,6 +171,7 @@ erDiagram
         string idp "invite in Phase 1 - reserved for federation"
         string bootstrap_secret_hash "nullable - bootstrap account only, cleared on conversion"
         string status "active / suspended / deleted"
+        string mail_state "last known deliverability of the address of record - support diagnostic, NOT authorization"
         string created_at
         string created_by
         string last_login_at
@@ -185,8 +195,9 @@ erDiagram
         string created_at
         string expires_at "checked in APP CODE"
         string sent_at
-        string delivery_status "sent / delivered / bounced / complained"
-        number resend_count "capped"
+        string delivery_status "queued / sent / delivered / bounced / complained / failed"
+        string delivery_reporting "supported / unavailable - snapshotted at send time"
+        number resend_count "capped - accounting rule in 6.3"
         string consumed_at "set on POST only - single-use marker"
         string consumed_ip
         string consumed_ua
@@ -198,6 +209,8 @@ erDiagram
         string created_at
         string expires_at "short - see 7.1 - checked in APP CODE"
         string requested_ip
+        string delivery_status "same enum as INVITATIONS - a bounced sign-in link must land somewhere"
+        string delivery_reporting "supported / unavailable - snapshotted at send time"
         string consumed_at "set on POST only - single-use marker"
         string consumed_ip
         string consumed_ua
@@ -215,21 +228,47 @@ erDiagram
     }
 
     ASSESSMENTS {
-        string id PK "widened - see P1-4"
+        string assessment_id PK "widened - see P1-4"
         string user_id FK "owner - stamped server-side from session"
         string org_id FK "REQUIRED - the tenant boundary"
-        string status "GSI status_index - replaces the full Scan"
+        string status "queue via sparse per-org index - data_architecture_phase1.md 4.5"
         string created_at
         string org_name_at_creation "snapshot"
-        json session "existing pipeline output"
-        json scorecard "existing"
-        string partner_note "existing"
+        string current_version_id "payload lives on assessment_versions - data_architecture_phase1.md 4.1"
     }
 ```
 
 `ORGANIZATIONS`, `USERS`, `PARTNER_ASSIGNMENTS`, `INVITATIONS`, `AUTH_LINKS` and `SESSIONS` are new
-tables. `ASSESSMENTS` is the existing `ai-readiness-diagnostic-sessions` table with added attributes
-and GSIs — additive, no rewrite.
+tables. `ASSESSMENTS` replaces the existing `ai-readiness-diagnostic-sessions` table.
+
+**It is neither additive nor a rewrite: the table is new and empty.** An earlier revision of this
+paragraph said `ASSESSMENTS` is the existing table with attributes added, and a later one said the
+opposite — that versioning forces a genuine backfill, because `store.py:88` serializes the whole
+assessment into a single `doc` string and DynamoDB cannot split an attribute in place. **Decided
+7 August 2026: the legacy table holds demo and test records only and is abandoned, not migrated**
+(`data_architecture_phase1.md` §16). There is no item to add attributes to and none to rewrite. Every
+record in `ASSESSMENTS` is written by the new path in its final shape, carrying `org_id` and `user_id`
+from the first write.
+
+**There is therefore no tenant backfill in §12.2 Phase 2.** What that phase does is create the table
+with tenancy in it, which is the same act as creating the version chain — one piece of work, not two
+that must be co-scheduled. The `SHOULD`-execute-as-one-pass rule this paragraph used to carry, and the
+conditions for splitting it, are both retired; `data_architecture_phase1.md` §4.4 amendment 2 records
+what replaced them.
+
+The attribute-level shape of `ASSESSMENTS`, its indexes and its version chain are specified in
+`data_architecture_phase1.md` §4.1 and §4.4, which is normative for keys, indexes, versioning and
+concurrency. This diagram carries only what authorization reads.
+
+**Delivery state is carried on both token tables, not just on invitations.** `AUTH_LINKS` previously
+had no delivery attributes at all, which left a bounced sign-in link with nowhere to land: the
+executive cannot get in and support has nothing to read. Both tables now carry `delivery_status` and
+`delivery_reporting`, and `USERS` carries `mail_state` — the last known deliverability of the address
+of record, so the diagnosis survives the token's expiry. `mail_state` is a support signal and
+**MUST NOT** be read as an authorization input; a bouncing address is not a suspended account (§3).
+The state machine and the `delivery_reporting` snapshot rule are in `../specs/outbound_mail_transport.md`
+§3.2. **Indexes** on these attributes are not specified here — `provider_message_id` and the GSI that
+serves the delivery webhook belong to `data_architecture_phase1.md` §4.6.
 
 Constraints the diagram cannot express:
 
@@ -245,9 +284,11 @@ Constraints the diagram cannot express:
 - **A partner's organization reach lives in `PARTNER_ASSIGNMENTS`, not on the user record.** The link
   is a grant: it records who created it and when, and is revocable without rewriting the partner.
 - **`org_id` on the user record is singular.** One attribute **MUST NOT** carry two meanings.
-- **DynamoDB does not enforce uniqueness on a GSI.** Email uniqueness **MUST** be enforced either by
-  using the normalized email as the partition key or by a companion `EMAIL#<email>` reservation item
-  written in a transaction.
+- **DynamoDB does not enforce uniqueness on a GSI.** Email uniqueness **MUST** be enforced by a
+  companion reservation item keyed on `email_normalized`, written with the user record in one
+  `TransactWriteItems` (`data_architecture_phase1.md` §4.3). The alternative of keying `users` on the
+  normalized email is closed: this table is keyed on `user_id`, and an account's address survives its
+  own normalization rules better than a partition key does.
 - **`email` on a `partner` or `admin` record is immutable** (§6.5 rule 2). No application route
   updates it.
 - **Sessions are server-side.** Access **MUST** be revocable on role change, organization change and
@@ -387,11 +428,32 @@ un-swept token remains readable. The TTL attribute is cleanup only. The same rul
 Only `sha256` hashes are persisted. Tokens **MUST NOT** appear in application logs, access logs,
 audit entries, or console output.
 
+**The link base MUST come from configuration (`AIDIAG_PUBLIC_BASE_URL`), never from the request
+`Host` header.** Deriving it from the request means host-header injection yields an
+attacker-controlled authentication link — and under §1 the link *is* the whole of authentication. A
+non-`https` value **MUST** be refused when `AIDIAG_ENV=production` (**P0-1**).
+
+**Click tracking MUST be disabled on every message carrying a token.** Open- and click-tracking
+rewrite the URL to route through the provider's domain, which puts a live single-use credential
+through a third party and into that provider's logs, and breaks the sender-domain match a suspicious
+recipient checks (§6.1). On SES this is a per-configuration-set setting, not a per-message one — see
+`../specs/outbound_mail_transport.md` §3.6.
+
 **Re-request MUST exist and MUST be rate-limited.** An executive recipient will routinely miss a
 short window; expiry without a self-service path produces support tickets, not security. The
 expired-link page offers a new token, sent to the address already on the record. The request **MUST** be keyed off the expired token or an
 authenticated context and **MUST NOT** accept an address from the caller. Limits apply per target
 account and globally; `resend_count` is capped, after which re-issue is required.
+
+**What increments `resend_count`, stated because the cap is otherwise unimplementable.** It counts
+deliberate resends and delivery-failure resends — one per send the *issuer* asked for. It is **not**
+incremented by an idempotent re-upload (§6.4), because one accidental double upload would otherwise
+burn the cap for every row in the file at once; and **not** by a transport-level retry of the same
+message, which is invisible above the mail interface. The full interaction table, including which
+re-upload outcomes re-send the existing token versus mint a new one, is
+`../specs/outbound_mail_transport.md` §3.7. Counting only holds across token generations if the
+invitation chain has a stable identifier — `invitation_id` in `data_architecture_phase1.md` §4.6.
+Without it a re-request creates a new item, `resend_count` restarts at zero, and this cap never binds.
 
 **Responses MUST NOT disclose account existence.** Expired, consumed, unknown and revoked tokens
 return one neutral message. A sign-in request for an unknown address returns the same response as one
@@ -517,10 +579,22 @@ cross-organization read access. They **MUST NOT** be relaxed to match the client
 | `POST /api/admin/partners`, partner↔org linking | — | — | — | — | ✓ |
 | `GET /api/admin/audit` | — | — | — | — | ✓ |
 | `GET /api/fixture/{name}` | — | — | — | ✓ | ✓ |
+| `POST /api/mail/events/{secret}` *(new)* | ✗ *see below* | — | — | — | — |
 | `/api/debug*` | **removed** | | | | |
 
 `/api/review/*` **MUST** filter by the caller's active partner assignments. It currently returns every
 organization's assessments to any caller (`evaluation_suite.md:512`).
+
+**`POST /api/mail/events/{secret}` is network-reachable but not public in the authorization sense.**
+It is the transport's delivery-event callback, so it has no session and no role — the caller is a
+provider, not a principal, and the column above is `✗` rather than `✓` for that reason. It is
+authenticated by *payload*, and **MUST** carry two independent gates: a shared secret in the path,
+compared with `hmac.compare_digest`; and provider signature verification, with the signing-certificate
+host matched against an exact pattern rather than a substring, since a look-alike host is the classic
+bypass. Both are required. Without them the route is a status-forgery hole — anyone could mark an
+invitation `bounced` and drive the issuer into a resend loop. It **MUST** be registered above the SPA
+catch-all (**P1-2**). Handler semantics — idempotency, status precedence, and returning 200 for
+deliberately ignored events — are in `../specs/outbound_mail_transport.md` §3.2.
 
 ### 8.2 Current exposure
 
@@ -637,7 +711,10 @@ in `companion_05:964-993`.
   interacts with §7.1: the session survives a refresh, but the answers do not.
 - **Consent is per-submission, not per-account.** `ConsentRecord` is captured with each assessment
   (`app/models.py:52`). Accounts introduce a second consent surface — terms accepted at registration —
-  which **MUST NOT** be conflated with C-1…C-5.
+  which **MUST NOT** be conflated with C-1…C-5. **Decided 7 August 2026**, and this is the position of
+  record: `data_architecture_phase1.md` §8 briefly stated the opposite and now keys `consent_records`
+  on `assessment_id` to match. That document is normative for the shape and for what per-submission
+  costs — a blanket withdrawal is a batch, not a single write.
 - **Erasure surface.** A data-subject request currently touches one record. Under this specification
   it spans users, invitations, sign-in links, sessions, assessments, audit entries and cached PDFs.
   Parked at §13.1.
@@ -754,15 +831,18 @@ carrying §11.1.
 
 | Phase | Work | Blocked on | Effort |
 |---|---|---|---|
-| **0** | ALB, ACM certificate, DNS, 80→443 redirect, task SG narrowed to the ALB (**P0-1**). Interim gate on `/review` and `/api/review/*` (**P0-2**). Rate limits on `/api/assess` and `/api/fixture/*` (**P0-3**). Remove `/api/debug*` (**P0-4**). Begin mail sender verification. | Nothing | 1–2 days infra, 0.5 day app |
+| **0** | ALB, ACM certificate and **all DNS for `air.dxc.com` as one work item** — the ALB record, plus SES sender verification with its DKIM and DMARC records (`../specs/outbound_mail_transport.md` §2.3). 80→443 redirect, task SG narrowed to the ALB (**P0-1**). Interim gate on `/review` and `/api/review/*` (**P0-2**). Rate limits on `/api/assess` and `/api/fixture/*` (**P0-3**). Remove `/api/debug*` (**P0-4**). | Nothing | 1–2 days infra, 0.5 day app |
 | **1** | `users` / `organizations` / `invitations` / `auth_links` / `sessions` tables. Link issuance and consumption, session creation and rolling expiry (§7). Authorization middleware ordered ahead of the SPA catch-all (**P1-2**). CORS restricted to explicit origins (**P1-1**). Cookie hardening. | Phase 0 | 4–6 days |
-| **1b** | Sender domain verification, DKIM/SPF/DMARC, sending-limit release, invitation and sign-in templates, bounce and complaint handling. | Open point **E** | 2–3 days work, ~1 week elapsed |
-| **2** | Invitation issue/send/accept, consume-on-POST, expiry in application code, expired-link page with rate-limited re-request. `user_id` and `org_id` on records, GSIs, backfill of legacy records to a synthetic owner (**P1-3**). Widen assessment ids (**P1-4**). `GET /api/me/assessments`. Intake pre-fill. | Phase 1b, open point **F** | 5 days |
-| **3** | Partner-assignment filtering on `/review`. Extend the existing review surface rather than adding a second dashboard. User and organization management. Staff-event notification (§6.5 rule 4). Audit log (**P1-5**). | Phase 2 | 5–8 days |
-| **4** | Rate limits on link request and invitation accept. Session revocation on authorization change. Self-service session listing (§7.2 rule 5). Retention TTL. | Open point **C** | 3 days |
+| **1b** | Sending-limit release out of the SES sandbox, invitation and sign-in templates, the `app/mail/` interface and its SES driver, the delivery-event webhook (§8.1), bounce and complaint handling. Verification and the DNS records themselves are Phase 0. | Phase 0 — the DNS records must be published and verified first. **No longer blocked on an open point:** **E** is closed (§14) | 2–3 days work, ~1 week elapsed |
+| **2** | Invitation issue/send/accept, consume-on-POST, expiry in application code, expired-link page with rate-limited re-request. `assessments` created new and empty with `user_id`, `org_id` and its GSIs (**P1-3**) — **no backfill; the legacy table is abandoned** (§4, `data_architecture_phase1.md` §16), and this is the same act as creating the version chain, not a second pass over it. `audit_log` table created here, not in Phase 3 (§10 rule 8 binds from this phase). Assessment ids are 128-bit from the first write (**P1-4**) — width reduces the blast radius; route authorization is what fixes the finding (`data_architecture_phase1.md` §16.3). `GET /api/me/assessments`. Intake pre-fill. | Phase 1b, open point **F**, and open point **I2** in `llm_architecture_and_output_assurance_phase1.md` §6 item 9 — see the note under §14. **What changed on 7 August is scheduling, not the gate:** splitting the backfills would have let tenancy land ahead of the versioning pass, and there is no backfill to split | 5 days |
+| **3** | Partner-assignment filtering on `/review`. Extend the existing review surface rather than adding a second dashboard. User and organization management. Staff-event notification (§6.5 rule 4). Audit **viewer and actor index** (**P1-5**); the store itself lands in Phase 2. | Phase 2 | 5–8 days |
+| **4** | Rate limits on link request and invitation accept. Session revocation on authorization change. Self-service session listing (§7.2 rule 5). Retention job (`data_architecture_phase1.md` §13) — **not** a TTL sweep; TTL leaves the S3 payloads and rendered PDFs behind. | Open point **C** | 3 days |
 
 **Mail sender verification is elapsed time, not effort, and under §1 it gates all provisioning and all
-sign-in.** It is on the critical path alongside **P0-1** and begins in Phase 0.
+sign-in.** It is on the critical path alongside **P0-1** and begins in Phase 0 — in the same work item,
+because the ALB record and the sender records resolve on the same zone and are one ask of whoever
+administers it. The elapsed time is DNS propagation and the SES sandbox release, neither of which
+shortens by starting Phase 1 first.
 
 ---
 
@@ -784,10 +864,13 @@ not govern erasure, and this section is the reason it does not.
 What a Stage 2 erasure design has to settle:
 
 - **Scope of a single request.** Erasure spans `users`, `invitations`, `auth_links`, `sessions`,
-  `assessments`, cached scorecard PDFs, mail-provider delivery logs, application and access logs, and
-  any contribution the assessment made to a peer benchmark corpus. The benchmark case is the hard
-  one: a contribution that has been aggregated may not be individually removable, which is a design
-  constraint on the benchmark rather than on this document.
+  `assessments`, `assessment_versions`, cached scorecard PDFs, mail-provider delivery logs,
+  application and access logs, and any contribution the assessment made to a peer benchmark corpus.
+  Two further scopes did not exist when this section was written and are added by
+  `data_architecture_phase1.md` §13: **interview turns and any stored audio**, and **S3 version
+  payloads and pinned artifacts**. The benchmark case is the hard one: a contribution that has been
+  aggregated may not be individually removable, which is a design constraint on the benchmark rather
+  than on this document.
 - **What survives erasure, and on what basis.** The audit entry recording the erasure survives it.
   Whether any other audit entry survives, and under which lawful basis, is undecided.
 - **Separation from the operational path.** Erasure is a distinct, audited procedure invoked only on
@@ -871,10 +954,45 @@ Not decided. Each blocks the work named.
 | **B** | Formal acceptance of single-factor authentication for `partner` and `admin`, whose reach is cross-organization (§11.2), and the point at which an independent second factor becomes mandatory. Not independent of **A** — adopting Entra answers it (§13.2). | §1, Phase 1 sign-off |
 | **C** | Assessment retention period. | Phase 4 TTL, §13.1 |
 | **D** | Whether a `power_user` grant requires recorded client authorization in addition to partner action. Disclosure cannot be walked back once a colleague's scorecard has been seen, which is why `user` is the default and elevation is explicit (§2). | §3, Phase 2 |
-| **E** | Mail sending mechanism and sender domain. Candidates on record: Amazon SES, or sending as a real DXC mailbox through Microsoft Graph. Both need DNS records; the second needs DXC IT. | Phase 1b, and therefore all provisioning and sign-in |
 | **F** | Whether the public sample scorecard path is retained (§6.6). | Phase 2 routing |
 | **G** | When erasure leaves Stage 2 (§13.1). Soft delete alone is not a data-protection position, and the beta is client-facing. | §13.1 |
 | **H** | Invitation validity window (§7.1). | §6.2, §6.3 re-request design |
+
+**Point E is closed, and its letter is retired rather than reused.** The mail sending mechanism is
+**Amazon SES**, sender `no-reply@air.dxc.com` behind a provider-agnostic interface; the decision and
+the disqualification of the alternatives are `../specs/outbound_mail_transport.md` §2 and §2.1. The
+deciding argument is this document's own §4: Microsoft Graph `sendMail` returns `202 Accepted` and
+nothing further, and cannot produce `complained` at all, so it cannot implement the `delivery_status`
+that §6.1 rule 5 makes visible to the issuer. Graph is kept as a driver swap, on nobody's critical
+path. Letters are not reused, so an external citation of **E** still resolves to this paragraph.
+
+What survives the closure is a *task*, not a decision: administration of the `air.dxc.com` zone, and
+the DKIM and DMARC records that make the sender align. That is folded into the §12.2 Phase 0 DNS
+work item, not carried here.
+
+**Imported dependency — not a point of this register.** **Phase 2 is blocked on a product decision no
+register in this document contains:** open point **I2**, owned by
+`llm_architecture_and_output_assurance_phase1.md` §6 item 9. It gates
+`data_architecture_phase1.md` §17 **Stage 0a**, and Stage 0a gates that document's Stage 2 — which
+*is* §12.2 Phase 2, because creating `assessments` with tenancy and creating it with a version chain
+are one act (§4).
+
+**It is one edge, not a chain.** That document's Stages 0b and 1 are independent of **I2** and can
+proceed today, so the wait is on the taxonomy reconciliation alone rather than on three stages in
+series.
+
+**What changed on 7 August 2026 is narrower than it first looks.** This note used to offer *"split
+the backfills and accept the double rewrite rather than wait."* The legacy table is abandoned
+(`data_architecture_phase1.md` §16), so there is no backfill to split and that sentence is
+withdrawn — but it was a *scheduling* escape, letting tenancy land ahead of the versioning pass, not
+a way of proceeding without **I2**. The taxonomy exposure is unchanged: it has always been about
+newly written versions, backfilled ones were excluded from comparison in any case, and the first
+version written is a real client's, immutable by that document's §5.3 rule 2 and permanently
+non-comparable if the taxonomy underneath it is unreconciled. That was true on 6 August and is true
+now. **I2's urgency did not move**; `data_architecture_phase1.md` §17 records the escape that does
+remain.
+
+`data_architecture_phase1.md` §19 continues this document's lettering at **I**; read it next.
 
 ---
 
@@ -883,13 +1001,16 @@ Not decided. Each blocks the work named.
 - **Pipeline durability.** Assessments persist only after the full pipeline returns, so a task
   replacement mid-request loses the submission while the client surface reports success. See
   `architecture_topics.md` §7.
-- **Voice-session durability.** Answers accumulate client-side and submit only at the end; a dropped
-  call loses the session.
 - **Multi-tenancy proper** — per-client infrastructure isolation, per-organization encryption keys,
   region pinning. Organizations are a logical boundary in Phase 1 (§4), enforced in application code
   against one table in one region.
 - **Residency, consent language and regulatory position.** See `architecture_topics.md` §4.
 - **Encryption of assessment PII at the application layer.** See `architecture_topics.md` §5.
+
+**No longer out of scope: voice-session durability.** Answers accumulated client-side and submitted
+only at the end, so a dropped call lost the whole interview. Server-side turn append closes it
+(`data_architecture_phase1.md` §7 rule 1), subject to that document's **D-8** — the agent must send a
+`question_id` before a turn can be stored as anything but prose.
 
 ---
 

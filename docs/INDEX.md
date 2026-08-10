@@ -1,6 +1,6 @@
 # Documentation Index
 
-**Updated:** 4 August 2026
+**Updated:** 6 August 2026
 
 Every project document except the root `README.md`, which stays at the repository root by convention.
 
@@ -26,8 +26,34 @@ Target-state design, and analyses of the gap between design and build.
 |---|---|---|---|---|
 | 2026-06-17 | [aws_reference_architecture_and_cost_model.md](architecture/aws_reference_architecture_and_cost_model.md) | AWS reference architecture and cost model by Chris Bryson: component list, sizing (50 client orgs/month, ~175 interviews/month), lean ~$640/month production, per-environment costs, cost-control levers. Target state, largely unbuilt — it describes Cognito, Lambda, Step Functions and CloudFront, none of which exist in `terraform/`. Renamed from `architecture.md` on 2026-08-04. | PROD | ACTIVE |
 | 2026-08-04 | [architecture_topics.md](architecture/architecture_topics.md) | Ten architectural topics the platform must decide, each split into specified / current / open with `file:line` citations, plus a sequencing recommendation. | MVP | ACTIVE |
-| 2026-08-04 | [authorization_model_phase1.md](architecture/authorization_model_phase1.md) | **Draft specification — the single source for access control.** Passwordless email identity for all roles — single-use sign-in link plus rolling server-side session, no stored credential and no second factor in Phase 1; four roles (`user` / `power_user` / `partner` / `admin`); organizations as a first-class tenant boundary; partner assignments; capability and route matrices; bootstrap (the one password-style exception), invitation, token-lifecycle and sign-in rules; session lifetimes; findings P0-1–P1-5 and P2; enforcement rules; residual risks; Phase 1 scope cut and delivery sequence; Stage 2 parking area (erasure); open points A–H. Absorbed and replaced `architecture_review_access_control.md` (3 Aug) on 4 Aug. | MVP | ACTIVE |
+| 2026-08-04 | [authorization_model_phase1.md](architecture/authorization_model_phase1.md) | **Draft specification — the single source for access control.** Passwordless email identity for all roles — single-use sign-in link plus rolling server-side session, no stored credential and no second factor in Phase 1; four roles (`user` / `power_user` / `partner` / `admin`); organizations as a first-class tenant boundary; partner assignments; capability and route matrices; bootstrap (the one password-style exception), invitation, token-lifecycle and sign-in rules; session lifetimes; findings P0-1–P1-5 and P2; enforcement rules; residual risks; Phase 1 scope cut and delivery sequence; Stage 2 parking area (erasure); open points A–H, of which **E is closed** — mail transport decided in `architecture/analysis/outbound_mail_transport.md`, whose amendments §4, §6.3, §8.1 and §12.2 now carry. Absorbed and replaced `architecture_review_access_control.md` (3 Aug) on 4 Aug. | MVP | ACTIVE |
+| 2026-08-05 | [data_architecture_phase1.md](architecture/data_architecture_phase1.md) | **Draft specification — the single source for keys, indexes, versioning and concurrency.** Closes topic 3 and extends `authorization_model_phase1.md` §4. Replaces the one-table JSON blob with fourteen tables; `org_id` / `user_id` on every assessment; immutable append-only run versions with a monotone parent pointer; an input fingerprint that classifies why two runs differ (and states that reproducibility cannot be claimed); voice interviews persisted turn-by-turn; a separate invitations table; sparse per-organization review queue replacing the `Scan`; optimistic locking closing both BLOCKER races; audit log; S3 offload; and — decided 7 Aug 2026 — **no migration at all**: the legacy table holds demo and test records, so §16 is a cutover onto empty tables, which retires the backfill, the synthetic owner, the PITR dependency and the `Scan` exception, and closes open point **M**. Findings D-1–D-8 (D-1 blocking: the voice path scores a different dimension taxonomy, so a voice overall score is two-thirds Data Foundation and one-third the informational dimension; D-8: the live ElevenLabs agent does not implement its own documented tool contract, which is upstream of D-1). Proposes seven amendments to the authorization spec, registered in §4.4 and applied there — the seventh (delivery state on `auth_links` and `users`) arriving from `architecture/analysis/outbound_mail_transport.md`. Open points I–N. | MVP | ACTIVE |
+| 2026-08-06 | [llm_architecture_and_output_assurance_phase1.md](architecture/llm_architecture_and_output_assurance_phase1.md) | **Draft specification — the single source for what a model decides, what untrusted content reaches a prompt, and what makes output fit to send.** Promoted from holding document on 6 Aug 2026; the promotion changed the register and added §5, and answered none of the open points. Chiefly **L-1**, prompt injection: untrusted input reaches five prompt sites unsanitized, rated BLOCKER in the audit and named in neither architecture spec. Records two surfaces the original finding predates — the third-party research payload interpolated into C2 (not reachable while `enable_research` is false) and the entire voice transcript interpolated into the voice scorer (new since `ed667aa`) — plus what contains the exposure today and what does not. Carries L-2–L-7 from `architecture_topics.md` §6: the D2 stub, the promised-but-unbuilt human gate, no eval strategy for generative text, hallucination and source attribution, the cost kill switch, and silent agent fallback. §4 fixes the boundary with the two written specs. §5 Integrations owns the ElevenLabs voice agent, benchmarked against the vendor deployment guide — findings **L-8–L-12** (the prompt generator writes to a path that no longer exists, no guardrail layer on the one agent that talks to a client executive, no standing control against contract drift, no server-side interview record, a third dimension taxonomy), requirements **R1–R7**, and a recommendation on **I2**: hybrid capture shrinks the largest injection surface rather than defending it. §6 lists the nine points not yet decided and, since 6 Aug 2026, **owns open point I2** — moved from `data_architecture_phase1.md` §19 because it decides where the determinism boundary sits for the voice channel, and it gates that document's Stage 0a and, through it, the authorization spec's Phase 2. §7 sequences delivery. | MVP | ACTIVE |
 | 2026-08-03 | [workflows_and_data_governance_baseline.md](architecture/workflows_and_data_governance_baseline.md) | The same three questions answered from the project's own documentation only, with the access-control review excluded. | MVP | ACTIVE |
+
+### architecture/analysis/
+
+**Indexed separately — see [architecture/analysis/INDEX.md](architecture/analysis/INDEX.md).**
+
+Decision records and investigations behind the design: why a choice was made, what was ruled out, and
+what remains blocked on someone outside the team. Nothing here is normative — the requirements that
+resulted are stated in the specifications, and where the two disagree the specification governs.
+
+Holds `outbound_mail_transport.md`, the SES decision record, which lived under `specs/` until
+10 August 2026 and moved when that directory became the home of the normative `SPEC_*` family.
+
+## specs/
+
+**Indexed separately — see [specs/INDEX.md](specs/INDEX.md).**
+
+The normative `SPEC_*` engineering specification family: what shall be true, one subsystem per document,
+plus the two shared references the family draws on (`dictionaries.md`, `role_model.md`). These are the
+documents of record where they overlap anything under `architecture/`.
+
+Individual specifications are **not listed here**. The family is large, cross-references itself heavily,
+and carries its own conventions, reading order and open-item register — all of which belong in one place
+beside the documents rather than duplicated into a repository-wide index that would go stale on every
+amendment. This file remains the directory-level map; `specs/INDEX.md` is the document-level one.
 
 ## product/
 
@@ -41,6 +67,7 @@ What the product is and how it behaves. The authoritative specification for the 
 | 2026-06-14 | [companion_04_agent_prompts.md](product/companion_04_agent_prompts.md) | Agent contracts A1–E3: inputs and outputs, model tiering, confidence thresholds, consent gating, anonymization rules, SLA decomposition, and cost kill switches. | R&D | ACTIVE |
 | 2026-06-14 | [companion_05_data_schemas.md](product/companion_05_data_schemas.md) | Data schemas: prospect record, responses, scores, findings, consent C-1–C-5, partner review, benchmark record, audit log; storage separation and versioning guidance. | R&D | ACTIVE |
 | 2026-06-14 | [ui_design_project_brief.md](product/ui_design_project_brief.md) | Five prospect-facing screens plus Screen 6, the partner review dashboard; design system, consent toggles, and copy. | R&D | ACTIVE |
+| 2026-08-10 | [how_sign_in_works.md](product/how_sign_in_works.md) | **Non-technical summary of `specs/SPEC_passwordless_email_auth.md`**, for managers, marketing, legal and support. What the user experiences, session and link lifetimes, the consent gate, the four roles and the `admin`-reads-no-reports boundary, what is and is not stored, the safeguards in plain terms, and the support scenarios. Also states the four limits worth knowing before anyone presents this externally — the mailbox is the only factor, mail is the sole channel for every role including administrators, and administrative recovery runs through deployment configuration — plus a say / do-not-say list for marketing. **Not normative**; the specification governs where the two differ. | MVP | ACTIVE |
 
 ## audit/
 
