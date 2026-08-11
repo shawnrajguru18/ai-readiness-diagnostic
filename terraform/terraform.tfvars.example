@@ -29,6 +29,24 @@ max_capacity       = 3
 # vpc_id    = "vpc-12345678"
 # subnet_ids = ["subnet-11111111", "subnet-22222222"]
 
+# Outbound mail (Amazon SES)
+# The address is verified as an e-mail identity: applying sends a verification link to
+# this mailbox, and sends fail until someone opens it. In the SES sandbox the recipient
+# must be a verified identity too.
+mail_from_address = "catalystx-support@dxc.com"
+mail_from_name    = "DXC AI Readiness"
+# mail_reply_to_address = "a-monitored-mailbox@dxc.com"
+
+# Test recipients, verified so a sandboxed account can send to them. Each owner gets a
+# verification mail they must open. Set these in your own terraform.tfvars, which is
+# gitignored — these are real mailboxes and do not belong in a tracked file. Use one
+# internal and one external address, since they exercise different delivery paths.
+# Remove once the account leaves the SES sandbox.
+# test_recipient_addresses = [
+#   "you@dxc.com",
+#   "your-external-test@example.com",
+# ]
+
 # Bedrock API Key and Endpoint (REQUIRED for LLM to work)
 # 1. Go to AWS Console → Bedrock → API keys
 # 2. Create a new API key

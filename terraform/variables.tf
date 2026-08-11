@@ -76,6 +76,30 @@ variable "subnet_ids" {
   default     = []
 }
 
+variable "mail_from_address" {
+  description = "SES sender address; its domain is the sending domain (SPEC_outbound_mail.md §6)"
+  type        = string
+  default     = "catalystx-support@dxc.com"
+}
+
+variable "mail_from_name" {
+  description = "From display name (SPEC_outbound_mail.md §6)"
+  type        = string
+  default     = "DXC AI Readiness"
+}
+
+variable "mail_reply_to_address" {
+  description = "Monitored reply mailbox (SPEC_outbound_mail.md §6); empty sends no Reply-To"
+  type        = string
+  default     = ""
+}
+
+variable "test_recipient_addresses" {
+  description = "Recipients verified as SES identities so a sandboxed account can send to them. Test scaffolding; remove once the account leaves the sandbox."
+  type        = list(string)
+  default     = []
+}
+
 variable "anthropic_api_key" {
   description = "AWS Bedrock API key (generate in AWS Console → Bedrock → API keys)"
   type        = string

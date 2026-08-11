@@ -10,8 +10,65 @@ ECR (Docker images)
 ECS Fargate (containerized app)
   ├→ DynamoDB (session state)
   ├→ Bedrock (Claude API)
+  ├→ SES (outbound mail — send path only)
   └→ CloudWatch (logs)
 ```
+
+## Outbound mail (SES smoke test)
+
+`ses.tf` verifies `catalystx-support@dxc.com` as an SES **e-mail address identity** and
+grants the task role `ses:SendEmail` scoped to that address. It exists to prove the send
+path works; it is not the mail transport of
+[`SPEC_outbound_mail.md`](../docs/specs/SPEC_outbound_mail.md). Missing from it: DKIM/SPF/DMARC
+records (§22), delivery event publication and ingestion (§13), a configuration set with
+tracking disabled (§20.2), and the suppression list (§14).
+
+Three things gate a successful send, and all three fail with an unhelpful SES error:
+
+1. **Identity verification.** `terraform apply` makes SES mail a verification link to
+   `catalystx-support@dxc.com`. Until someone opens it, every send returns
+   `MessageRejected`. Check with `terraform output ses_identity_verified` or:
+   ```bash
+   aws sesv2 get-email-identity --email-identity catalystx-support@dxc.com --region us-east-1
+   ```
+2. **Sandbox mode.** A new SES account can only send *to* verified addresses. Verify the
+   test recipient too, or request production access in the SES console.
+3. **Region.** The identity and the container's `AIDIAG_SES_REGION` must match; both
+   follow `aws_region`.
+
+Then send the test messages — one internal, one external:
+
+```bash
+curl -X POST http://<task-public-ip>:8080/api/test-email \
+  -H 'Content-Type: application/json' -d '{"to": "<your-internal-address>@dxc.com"}'
+
+curl -X POST http://<task-public-ip>:8080/api/test-email \
+  -H 'Content-Type: application/json' -d '{"to": "<your-external-address>@example.com"}'
+```
+
+Subject `Test`, body `test`. A success returns the SES message id; a failure returns 502
+with the SES error code.
+
+### Expect the message to be quarantined, and read that as a result
+
+`dxc.com` publishes `v=DMARC1; p=quarantine; sp=reject` and an SPF record that redirects
+to `dxc.com.on.autospf.email` — which does not authorize SES's sending IPs. Sending as
+`catalystx-support@dxc.com` from an address identity means:
+
+| | Aligns to | DMARC |
+|---|---|---|
+| SPF | `amazonses.com` (SES default MAIL FROM) | fails alignment |
+| DKIM | `amazonses.com` (no DKIM key for `dxc.com`) | fails alignment |
+
+So DMARC fails and `p=quarantine` applies. Gmail will most likely spam-folder or drop the
+external message; DXC's own inbound gateway is *more* likely to block the internal one,
+since an external IP sending as `dxc.com` is exactly the spoofing pattern it exists to
+stop. A 200 with a message id means SES accepted it — nothing more. That is §1's point
+made concrete: **a message handed to a transport is not a message delivered.**
+
+Fixing this is not a code change. It needs §22: a sending domain whose DNS you control
+(the spec names `air.catalyst.one`), verified as a *domain* identity with DKIM signing and
+a custom MAIL FROM subdomain, so SPF and DKIM both align.
 
 ## Prerequisites
 

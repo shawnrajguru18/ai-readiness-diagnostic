@@ -75,8 +75,26 @@ resource "aws_ecs_task_definition" "app" {
         {
           name  = "AIDIAG_FORCE_LLM"
           value = "true"
+        },
+        {
+          name  = "AIDIAG_MAIL_FROM"
+          value = var.mail_from_address
+        },
+        {
+          name  = "AIDIAG_MAIL_FROM_NAME"
+          value = var.mail_from_name
+        },
+        {
+          name  = "AIDIAG_SES_REGION"
+          value = var.aws_region
         }
       ],
+      var.mail_reply_to_address != "" ? [
+        {
+          name  = "AIDIAG_MAIL_REPLY_TO"
+          value = var.mail_reply_to_address
+        }
+      ] : [],
       var.anthropic_api_key != "" ? [
         {
           name  = "ANTHROPIC_API_KEY"
@@ -137,7 +155,8 @@ resource "aws_ecs_service" "app" {
 
   depends_on = [
     aws_iam_role_policy.task_role_dynamodb,
-    aws_iam_role_policy.task_role_bedrock
+    aws_iam_role_policy.task_role_bedrock,
+    aws_iam_role_policy.task_role_ses
   ]
 }
 

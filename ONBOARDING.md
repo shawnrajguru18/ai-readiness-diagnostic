@@ -4,17 +4,117 @@ Welcome! This guide will get you up to speed on the AI Readiness Diagnostic plat
 
 ---
 
+## ✅ Prerequisites
+
+Install these before anything else. The version floors are real — the app uses Python 3.12
+syntax and the Terraform config declares `required_version >= 1.0`.
+
+| Tool | Version | Needed for |
+|---|---|---|
+| **Python** | 3.12+ | backend, test suite |
+| **Node.js** | 18+ | React frontend (`web/`) |
+| **Git** | any recent | cloning, the three remotes below |
+| **Docker** | Desktop 4.x+ | building the container image |
+| **AWS CLI** | **v2** (not v1) | ECR login, ECS, SES, logs |
+| **Terraform** | >= 1.0 | infrastructure in `terraform/` |
+| **jq** | any | only for the `deploy/aws/*.sh` shell path |
+
+You also need:
+
+- **Access to AWS account `023138541872`** with an MFA device enrolled. Every session starts
+  with `aws sts get-session-token` — see [Authentication & Credentials](#-authentication--credentials).
+- **Bedrock model access** enabled in `us-east-1` (Bedrock console → Model Access). Without it
+  the app silently falls back to the deterministic offline pipeline instead of erroring.
+
+Only building the frontend or running tests? You can skip Docker, the AWS CLI, and Terraform.
+
+### 🪟 Windows-specific install notes
+
+Most of the team is on Windows, and three of these installs have Windows-only traps.
+
+**Run PowerShell as Administrator for the next two.** `Amazon.AWSCLI` installs an MSI to
+`Program Files`, and Docker Desktop installs a system service and a WSL2 backend. Both fail
+with a permissions error in a normal terminal — and winget's message doesn't always make the
+cause obvious.
+
+```powershell
+# Right-click PowerShell -> "Run as Administrator"
+winget install --id Amazon.AWSCLI -e          # requires admin
+winget install --id Docker.DockerDesktop -e   # requires admin
+```
+
+These two do **not** need admin:
+
+```powershell
+winget install --id Hashicorp.Terraform -e
+winget install --id Python.Python.3.12 -e
+winget install --id OpenJS.NodeJS.LTS -e
+```
+
+Then, in order:
+
+1. **Close and reopen your terminal.** Installers extend `PATH`, and an open session keeps the
+   old copy. "`terraform` is not recognized" almost always means you skipped this.
+2. **Reboot if Docker Desktop asks.** It enables the WSL2 backend, which needs a restart. Launch
+   it and wait for "Engine running" — `docker build` fails against a stopped engine with a
+   confusing pipe error.
+3. **Verify all four:**
+   ```powershell
+   python --version ; node --version ; terraform version ; aws --version ; docker --version
+   ```
+   `aws --version` must print `aws-cli/2.x`. If it prints `1.x`, uninstall the old one first —
+   both on `PATH` shadow each other unpredictably.
+
+**Two shell gotchas that will waste your afternoon:**
+
+- **`curl` is not curl.** In PowerShell it's an alias for `Invoke-WebRequest`, which rejects
+  `-X` and `-d`. Use **`curl.exe`** explicitly, or run the command in Git Bash.
+- **Use Git Bash for `docker login`.** The ForceMFA policy on this account makes PowerShell's
+  `docker login` return 400 Bad Request. Same credentials work fine in Bash — see
+  [Gotcha #3](#3-powershell-vs-bash-for-docker-ecr).
+
+---
+
 ## Quick Start (TL;DR)
 
 **Live app:** `https://ai-readiness-alb-751626769.us-east-1.elb.amazonaws.com`
 
 **Local dev:**
-```bash
-# Backend (Python 3.12+)
-cd app
-pip install -r requirements.txt
-python -m uvicorn app.api:app --reload
 
+Backend (Python 3.12+). Create a virtual environment **first** — installing into the system
+Python mixes this project's pins with everything else on your machine, and recent Python builds
+refuse a bare `pip install` outside a venv anyway (`externally-managed-environment`).
+
+Run these from the **repo root**, not from `app/` — `requirements.txt` lives at the root, and
+`app.api:app` only resolves as a module path if the root is your working directory.
+
+```bash
+# 1. Create the venv (once per checkout)
+python -m venv .venv
+
+# 2. Activate it (every new terminal)
+.venv\Scripts\Activate.ps1      # Windows PowerShell
+source .venv/Scripts/activate   # Windows Git Bash
+source .venv/bin/activate       # macOS / Linux
+
+# 3. Install dependencies (once, and after requirements.txt changes)
+pip install -r requirements.txt
+
+# 4. Run
+python -m uvicorn app.api:app --reload
+```
+
+Your prompt shows `(.venv)` when it's active. If it doesn't, step 4 will fail with
+`ModuleNotFoundError: No module named 'fastapi'` — the usual cause is a new terminal where you
+skipped step 2.
+
+> **Windows:** if `Activate.ps1` fails with "running scripts is disabled on this system", allow
+> it for that session only: `Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass`.
+> Scoped to the process, so it resets when the terminal closes and changes nothing machine-wide.
+
+`.venv/` is gitignored — never commit it.
+
+```bash
 # Frontend (Node 18+, in another terminal)
 cd web
 npm install
@@ -264,9 +364,20 @@ curl -k https://ai-readiness-alb-751626769.us-east-1.elb.amazonaws.com/ping
 If you need to set up a new environment or rebuild from scratch, use Terraform.
 
 ### Prerequisites
-- Terraform >= 1.0 (https://www.terraform.io/downloads)
-- AWS CLI v2 configured with credentials
-- Docker (to build images)
+
+Terraform, AWS CLI v2 and Docker — all covered in [Prerequisites](#-prerequisites) above,
+including the Windows installs that need admin rights.
+
+Two things specific to running Terraform here:
+
+- **An MFA session token must be exported before every `terraform` command.** Terraform reads
+  the same `AWS_*` environment variables as the CLI; without them it fails at `plan` with a
+  credentials error. The token lasts 1 hour.
+- **Terraform state is stored locally**, in `terraform/terraform.tfstate`, and is gitignored.
+  It is the map from this config to the real AWS resources — without it Terraform assumes
+  nothing exists and tries to create everything again. Check whether you have it before your
+  first `apply`; see [Managing Terraform State](deploy/aws/terraform_deployment.md) for the
+  S3 remote-backend fix.
 
 ### Step 1: Configure Terraform
 

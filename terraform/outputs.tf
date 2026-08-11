@@ -24,6 +24,21 @@ output "dynamodb_table_name" {
 #   value       = aws_cloudwatch_log_group.ecs.name
 # }
 
+output "ses_identity_arn" {
+  description = "SES sender identity ARN"
+  value       = aws_sesv2_email_identity.sender.arn
+}
+
+output "ses_identity_verified" {
+  description = "SES sender verification status; sends fail until the mailbox owner opens the verification link"
+  value       = aws_sesv2_email_identity.sender.verified_for_sending_status
+}
+
+output "ses_test_recipients_verified" {
+  description = "Verification status per test recipient; a sandboxed account cannot send to an unverified one"
+  value       = { for k, v in aws_sesv2_email_identity.test_recipient : k => v.verified_for_sending_status }
+}
+
 output "task_role_arn" {
   description = "IAM task role ARN"
   value       = aws_iam_role.task_role.arn

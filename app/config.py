@@ -55,6 +55,15 @@ class Settings:
     model_haiku: str = os.getenv("AIDIAG_MODEL_HAIKU", "anthropic.claude-haiku-4-5")
     default_model: str = os.getenv("AIDIAG_MODEL_DEFAULT", "anthropic.claude-sonnet-5")
     effort: str = os.getenv("AIDIAG_EFFORT", "high")
+
+    # Outbound mail (Amazon SES) — see docs/specs/SPEC_outbound_mail.md §6, §21.
+    # These are the sender identity only; the settings-in-DynamoDB model of §21 is
+    # not implemented, so they are read from the environment for now.
+    ses_region: str = os.getenv("AIDIAG_SES_REGION") or os.getenv("AWS_REGION", "us-east-1")
+    mail_from: str = os.getenv("AIDIAG_MAIL_FROM", "catalystx-support@dxc.com")
+    mail_from_name: str = os.getenv("AIDIAG_MAIL_FROM_NAME", "DXC AI Readiness")
+    mail_reply_to: str = os.getenv("AIDIAG_MAIL_REPLY_TO", "")
+
     enable_research: bool = os.getenv("AIDIAG_ENABLE_RESEARCH", "false").lower() == "true"
     sec_user_agent: str = os.getenv("AIDIAG_SEC_USER_AGENT", "DXC AdvisoryX Diagnostic contact@dxc.com")
 

@@ -7,6 +7,7 @@
   GET  /api/review/{id}           full scorecard + validation + reasoning for review
   POST /api/review/{id}/decision  {decision: approved|sent_back, note}
   GET  /api/scorecard/{id}/pdf    server-side PDF deliverable (reportlab)
+  POST /api/test-email           {to} -> send a fixed test message through Amazon SES
   /                              React app (web/index.html)
   /review                        partner review dashboard (web/review.html)
 
@@ -87,6 +88,10 @@ class AssessRequest(BaseModel):
 class DecisionRequest(BaseModel):
     decision: str  # "approved" | "sent_back"
     note: str = ""
+
+
+class TestEmailRequest(BaseModel):
+    to: str
 
 
 @app.get("/health")
@@ -177,6 +182,29 @@ def debug_aws():
 
     results["llm_available"] = llm_available()
     return results
+
+
+# ---------------- SES smoke test ----------------
+# Registered ahead of the catch-all route below (SPEC_outbound_mail.md §13 note on
+# route shadowing). This is a transport check, not the mail layer of §11: no
+# suppression check, no invitation record, no template resolution, no delivery
+# state. Nothing but this endpoint should call app.mail.
+@app.post("/api/test-email")
+def test_email(req: TestEmailRequest):
+    from .mail import MailError, send_email, from_header
+
+    try:
+        message_id = send_email(req.to, "Test", "test")
+    except MailError as e:
+        return JSONResponse(
+            {"status": "failed", "to": req.to, "error": str(e)}, status_code=502
+        )
+    return {
+        "status": "sent",
+        "to": req.to,
+        "from": from_header(),
+        "message_id": message_id,
+    }
 
 
 @app.get("/api/fixture/{name}")
