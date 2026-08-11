@@ -43,6 +43,10 @@ resource "aws_sesv2_email_identity" "test_recipient" {
 # §20.4: authorization to send is scoped to the sending identity, so a workload
 # compromised through another path cannot send as an arbitrary address. Scoped twice —
 # by resource, and by the From address itself.
+#
+# In sandbox mode, we must verify both sender and test recipients as SES identities,
+# so the Resource includes both. Once the account leaves the sandbox, remove
+# aws_sesv2_email_identity.test_recipient and revert Resource to sender.arn only.
 resource "aws_iam_role_policy" "task_role_ses" {
   name = "${local.app_name}-task-ses"
   role = aws_iam_role.task_role.id
@@ -54,7 +58,10 @@ resource "aws_iam_role_policy" "task_role_ses" {
       Action = [
         "ses:SendEmail"
       ]
-      Resource = aws_sesv2_email_identity.sender.arn
+      Resource = concat(
+        [aws_sesv2_email_identity.sender.arn],
+        [for identity in aws_sesv2_email_identity.test_recipient : identity.arn]
+      )
       Condition = {
         StringEquals = {
           "ses:FromAddress" = var.mail_from_address
