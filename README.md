@@ -97,3 +97,18 @@ assets/            DXC brand kit (design source; nothing reads it at runtime)
 - **Deferred (per PRD/Companions):** real research tools B1/B2/B3 (SEC EDGAR/news/tech-stack, currently
   optional/off), B4/B5, C1 industry library, D1 persona-variant PDFs, E1–E3 downstream, partner-review
   dashboard (Screen 6), peer-benchmark data (V0.5+).
+
+## Going to PROD
+
+The application currently uses **Amazon SES in sandbox mode**, which limits email sending to verified email identities. The `/api/test-email` endpoint is live and operational with verified recipients.
+
+**To send transactional emails to arbitrary recipients in production:**
+
+1. **Request production access for SES:** [Moving out of the Amazon SES sandbox](https://docs.aws.amazon.com/ses/latest/dg/request-production-access.html)
+2. Once approved:
+   - Verify the sender domain (dxc.com) with DKIM signing
+   - Remove test_recipient_addresses from `terraform/terraform.tfvars`
+   - Revert IAM policy in `terraform/ses.tf` to sender identity only
+   - Update `terraform/ecs.tf` to configure the SES configuration set (delivery tracking, suppression list)
+
+**Specification:** See [docs/specs/SPEC_outbound_mail.md](docs/specs/SPEC_outbound_mail.md) for the full mail transport design (§20.4 covers the IAM scope for sandbox vs. production).
